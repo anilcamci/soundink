@@ -27,16 +27,19 @@ import violinIcon from './../../assets/icons/Violin.svg';
 import TrashIcon from './../../assets/icons/Trash.svg';
 
 
-
 // Constants for brush colors and sizes
-// const colors = ['#161a1d', '#ffb703', '#fb8500', '#023047', '#219ebc', '#d62828', '#9a031e', '#5f0f40', '#006400', '#8ac926'];
-const colors = ['#161a1d', '#ffb703', '#219ebc', '#9a031e', '#006400'];
+// const colors = ['#161a1d', '#ffb703', '#fb8500', '#023047', '#219ebc', '#d62828', '#9a031e', '#5f0f40', '#006400', '#8ac926', LOCAL_ERASER_COLOR];
+
 const sizes = [25, 50];
 const MAX_DELAY = 600; // Maximum delay in milliseconds for the slowest speed
 
 const dotRadius = 3; // Radius of the dots
 const numDotsX = 50; // Number of dots horizontally
 const numDotsY = 15; // Number of dots vertically
+
+const ERASER_COLOR = '#eae6e1'; // Choose a color that represents the eraser
+const LOCAL_ERASER_COLOR = '#eae6e1'; // Match this to your background color
+const colors = ['#161a1d', '#ffb703', '#219ebc', '#9a031e', '#006400', LOCAL_ERASER_COLOR];
 
 // Options for stroke drawing (customizable for smoothness, taper, etc.)
 const options = {
@@ -82,6 +85,8 @@ const TlDrawCanvasComponent = () => {
   const [loop, setLoop] = useState(false); // To control looping
   let playbackStopped = useRef(false); // To stop playback externally
   const [scannedColumn, setScannedColumn] = useState(-1);
+  const [previousColor, setPreviousColor] = useState(colors[0]);
+
 
   // Add this at the top of your component, along with other state variables
   const [selectedColor, setSelectedColor] = useState(null); // Track the color for which the modal is shown
@@ -160,7 +165,11 @@ const TlDrawCanvasComponent = () => {
   // Handles the slider input for changing playback speed
   const handleSliderChange = (e) => {
     const value = Number(e.target.value);
-    setPlaybackSpeed(MAX_DELAY - value); // Ensure playbackSpeed is updated correctly
+
+    const playbackSpeedValue = 50 + value; // Adjusting the base to 200 ms
+    setPlaybackSpeed(playbackSpeedValue); // Ensure playbackSpeed is updated correctly
+
+    console.log("Current playback speed:", playbackSpeedValue);
   };
 
   // Called when user starts drawing (pointer down)
@@ -227,7 +236,43 @@ const TlDrawCanvasComponent = () => {
             );
           });
         });
-        return !isErased; // Keep only the non-erased lines
+        // return !isErased; // Keep only the non-erased lines
+
+        if (isErased) {
+          // Temporarily store intersections in undo stack instead of deleting
+          const intersectionData = line.intersections;
+          setUndoStack([...undoStack, { lines, sonificationPoints, intersectionData }]);
+          return false;
+        }
+  
+        return true;
+      });
+
+      // Collect IDs of erased lines
+      const erasedLineIds = lines
+      .filter(line => {
+        return line.points.some((point, i) => {
+          return currentLine.some((eraserPoint, j) => {
+            if (j === currentLine.length - 1) return false;
+            return doLineSegmentsIntersect(
+              line.points[i],
+              line.points[i + 1],
+              currentLine[j],
+              currentLine[j + 1]
+            );
+          });
+        });
+      }).map(line => line.lineId);
+
+      // Remove entries in intersectedDots associated with erased line IDs
+      erasedLineIds.forEach(lineId => {
+        for (const column in intersectedDots.current) {
+          for (const row in intersectedDots.current[column]) {
+            if (intersectedDots.current[column][row].lineId === lineId) {
+              delete intersectedDots.current[column][row]; // Remove specific intersection data
+            }
+          }
+        }
       });
   
       // Make sure to call stopSoundsForLine for the erased lines
@@ -252,7 +297,8 @@ const TlDrawCanvasComponent = () => {
   
       // Update the lines and sonification points after erasing
       const remainingSonificationPoints = updatedLines.flatMap(line => line.sonificationPoints);
-  
+      // Remove only visual points but preserve the undo data
+
       setLines(updatedLines); // Update state with the remaining lines
       setSonificationPoints(remainingSonificationPoints); // Update the remaining sonification points
       setRedoStack([]);
@@ -267,29 +313,29 @@ const TlDrawCanvasComponent = () => {
         color: currentColor,
         size: currentSize,
         sonificationPoints: [],
-        lineId // Assign the unique ID to the line
+        lineId, // Assign the unique ID to the line
+        intersections: {} // Initialize an object to store intersections
       };
-  
+
+      // Add intersections to both intersectedDots and newLine.intersections
       sonificationPoints.forEach(point => {
         for (let i = 0; i < numDotsX; i++) {
           for (let j = 0; j < numDotsY; j++) {
             const dotX = (window.innerWidth / numDotsX) * i + window.innerWidth / numDotsX / 2;
             const dotY = (window.innerHeight / numDotsY) * j + window.innerHeight / numDotsY / 2;
-            
+
             if (isPointNearDot(point[0], point[1], dotX, dotY, dotRadius, currentSize)) {
               if (!intersectedDots.current[i]) intersectedDots.current[i] = {};
-              
-              // Add the lineId to the stored data
-              // intersectedDots.current[i][j] = { point, color: currentColor, size: currentSize, lineId: newLine.lineId };
-              intersectedDots.current[i][j] = { point, color: currentColor, size: currentSize, lineId: newLine.lineId };
+              if (!newLine.intersections[i]) newLine.intersections[i] = {};
 
-              // Log each detected intersection with exact coordinates and color
-              // console.log(`Intersection detected at column ${i}, row ${j}, color: ${currentColor}`);
+              intersectedDots.current[i][j] = { point, color: currentColor, size: currentSize, lineId };
+              newLine.intersections[i][j] = { point, color: currentColor, size: currentSize, lineId };
             }
           }
         }
       });
   
+
       setUndoStack([...undoStack, { lines, sonificationPoints }]);
       setLines(prevLines => [...prevLines, newLine]);
       setRedoStack([]);
@@ -305,7 +351,7 @@ const TlDrawCanvasComponent = () => {
     playbackStopped.current = false;
 
     do {
-        for (let column = 0; column < numDotsX; column++) {
+        for (let column = 4; column < numDotsX; column++) {
             if (playbackStopped.current) break;
 
             setCurrentColumn(column);
@@ -331,20 +377,66 @@ const TlDrawCanvasComponent = () => {
     setIsPlaying(false);
 };
 
-  // Undo and redo logic for managing drawing history
+  // // Undo and redo logic for managing drawing history
   const handleUndo = () => {
     if (undoStack.length > 0) {
       const previousState = undoStack.pop();
+  
+      // Add current state to redo stack before applying undo
       setRedoStack([{ lines, sonificationPoints }, ...redoStack]);
+  
+      // Set lines and sonification points to the previous state
       setLines(previousState.lines);
+      setSonificationPoints(previousState.sonificationPoints);
+  
+      // Clear and rebuild intersection data based on the undone lines
+      intersectedDots.current = {}; // Reset first to avoid data carryover
+  
+      previousState.lines.forEach(line => {
+        if (!line.erased) {
+          // If the line was not erased, restore its intersection points
+          if (line.intersections) {
+            Object.entries(line.intersections).forEach(([column, rows]) => {
+              if (!intersectedDots.current[column]) intersectedDots.current[column] = {};
+              Object.entries(rows).forEach(([row, intersectionData]) => {
+                intersectedDots.current[column][row] = intersectionData;
+              });
+            });
+          }
+        }
+      });
     }
   };
 
+  // Updated redo functionality with intersection handling
   const handleRedo = () => {
     if (redoStack.length > 0) {
+      // Retrieve the next state from redo stack
       const nextState = redoStack.shift();
+  
+      // Add the current state to the undo stack before applying redo
       setUndoStack([...undoStack, { lines, sonificationPoints }]);
+  
+      // Update lines and sonification points with the redone state
       setLines(nextState.lines);
+      setSonificationPoints(nextState.sonificationPoints);
+  
+      // Clear and rebuild intersection data based on the redone lines
+      intersectedDots.current = {}; // Reset to avoid overlapping data
+  
+      nextState.lines.forEach(line => {
+        if (!line.erased) {
+          // If the line is visible (not erased), re-add its intersection points
+          if (line.intersections) {
+            Object.entries(line.intersections).forEach(([column, rows]) => {
+              if (!intersectedDots.current[column]) intersectedDots.current[column] = {};
+              Object.entries(rows).forEach(([row, intersectionData]) => {
+                intersectedDots.current[column][row] = intersectionData;
+              });
+            });
+          }
+        }
+      });
     }
   };
 
@@ -367,9 +459,9 @@ return (
           <div key={index} className="color-instrument-pair">
             <button
               className="color-button"
-              style={{ backgroundColor: color }}
+              style={{ backgroundColor: isEraser ? ERASER_COLOR : color }}
               onClick={() => {
-                setCurrentColor(color);
+                setCurrentColor(isEraser ? ERASER_COLOR : color);
                 setIsEraser(false);
               }}
             />
@@ -387,24 +479,35 @@ return (
       <div className="eraser-container">
         <button
           className={`eraser-button ${isEraser ? 'active' : ''}`}
-          onClick={() => setIsEraser(!isEraser)}
+          // onClick={() => setIsEraser(!isEraser)}
+          onClick={() => {
+            if (isEraser) {
+              // If eraser is already on, turn it off and restore the previous color
+              setCurrentColor(previousColor);
+            } else {
+              // If eraser is off, save the current color and set to eraser color
+              setPreviousColor(currentColor);
+              setCurrentColor(ERASER_COLOR);
+            }
+            setIsEraser(!isEraser); // Toggle the eraser mode
+          }}
         >
-          <img src={EraseIcon} alt="Eraser" className="iconEraser" />
+          <img src={TrashIcon} alt="Eraser" className="iconEraser" />
         </button>
         <button
           className={`trash-button ${isTrash ? 'active' : ''}`}
           onClick={() => setIsTrash(!isTrash)}
         >
-          <img src={TrashIcon} alt="Eraser" className="iconTrash" />
+          <img src={EraseIcon} alt="Eraser" className="iconTrash" />
         </button>
       </div>
 
       {/* Undo and Redo Buttons */}
-      <div className="undo-redo-group">
-        <button className="undo-button" onClick={handleUndo}>
+      <div className="steps-group">
+        <button className="undo" onClick={handleUndo}>
           <img src={UndoIcon} alt="Undo" className="iconDo" />
         </button>
-        <button className="redo-button" onClick={handleRedo}>
+        <button className="redo" onClick={handleRedo}>
           <img src={RedoIcon} alt="Redo" className="iconDo" />
         </button>
       </div>
@@ -424,7 +527,7 @@ return (
       </div>
 
       {/* Toggle Grid Visibility Button */}
-      <div className="grid-loop-container">
+      <div className="grid-loop-group">
         <button className="grid-button" onClick={toggleGrid}>
           <img src={GridIcon} alt="Grid Icon" className="iconGrid" />
         </button>
@@ -450,13 +553,18 @@ return (
           />
           </div>
           <div className="slider-group">
-            <input
+          <input
             type="range"
-            min="200"
-            max={MAX_DELAY}
+            min="0"
+            max="350"
             step="25"
-            value={MAX_DELAY - playbackSpeed}
-            onChange={handleSliderChange}
+            value={350 - (playbackSpeed - 50)} // Inverting the slider effect
+            onChange={(e) => {
+              const reversedValue = 350 - Number(e.target.value); // Reverse the slider's value
+              const playbackSpeedValue = 50 + reversedValue;
+              setPlaybackSpeed(playbackSpeedValue);
+              console.log("Current playback speed:", playbackSpeedValue);
+            }}
           />
           </div>
       </div>
