@@ -78,7 +78,7 @@ button {
   padding: 0px;
   overflow: hidden;
   font-family: 'Arial', sans-serif;
-  font-weight: bold;
+  /* font-weight: bold; */
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 1.8em;
@@ -445,7 +445,7 @@ button {
   font-size: 0.9em;
   color: #ffd500; /* Match the theme color */
   text-align: center;
-  font-weight: bold;
+  /* font-weight: bold; */
 }
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
@@ -960,22 +960,15 @@ button:hover .instrument-sidebar-icon {
 .scale-label {
   font-size: 1em;
   color: #ffd500; /* Adjust color to fit the theme */
-  font-weight: bold;
+  /* font-weight: bold; */
+  text-shadow: 
+    0 0 10px #ffe2d6,
+    0 0 1px #ffc400;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* ///////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ///////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ///////////////////////////////////////////////////////////////////////////////////////////////////// */
 
 
 /* Overlay for the loading pop-up */
@@ -1035,6 +1028,7 @@ button:hover .instrument-sidebar-icon {
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  font-family: 'Roboto', sans-serif; /* Apply font */
 }
 
 .instrument-options-grid {
@@ -1077,7 +1071,7 @@ button:hover .instrument-sidebar-icon {
 
 .instrument-label {
   font-size: 14px;
-  font-weight: bold;
+  /* font-weight: bold; */
   margin-top: 8px;
   color: #ffc400;
   text-align: center;
@@ -1096,6 +1090,7 @@ button:hover .instrument-sidebar-icon {
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  font-family: 'Roboto', sans-serif; /* Apply font */
 }
 
 /* Grid for Scale Options */
@@ -1120,7 +1115,7 @@ button:hover .instrument-sidebar-icon {
 /* Label Under Each Scale Option */
 .scale-label {
   font-size: 14px;
-  font-weight: bold;
+  /* font-weight: bold; */
   margin-top: 8px;
   color: #ffc400;
   text-align: center;

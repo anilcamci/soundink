@@ -11,7 +11,8 @@ const instruments = {
   guitar: 25,
   synthflute: 25,
   floom: 25,
-  strings: 25
+  strings: 25,
+  mute: 0, // Special case for muted sounds
 };
 
 // Function to dynamically generate file paths
@@ -130,6 +131,11 @@ export const playSound = async (
   const playbackSpeed = Math.round(60000 / bpm);
 
   let instrumentFolder = colorInstrumentMap[color] || 'defaultInstrument';
+
+  if (instrumentFolder === 'mute') {
+    // If instrument is mute, skip playback
+    return;
+  }
 
   // If the instrument is 'piano', randomly pick 'pianolow' or 'pianohigh'
   if (instrumentFolder === 'piano') {

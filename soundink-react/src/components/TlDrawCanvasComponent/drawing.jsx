@@ -28,6 +28,7 @@ import NoLoopIcon from './../../assets/icons/one-finger-svgrepo-com.svg';
 import downloadIcon from './../../assets/icons/download-square-svgrepo-com.svg';
 import uploadIcon from './../../assets/icons/upload-square-svgrepo-com.svg';
 
+import muteIcon from './../../assets/icons/mute-silent-volume-sound-off-svgrepo-com.svg';
 import bassIcon from './../../assets/icons/bass-svgrepo-com-3.svg';
 import guitarIcon from './../../assets/icons/guitar-svgrepo-com-5.svg';
 import marimbaIcon from './../../assets/icons/xylophone-svgrepo-com-6.svg';
@@ -52,6 +53,7 @@ const instrumentIcons = {
   marimba: marimbaIcon,
   piano: pianoIcon,
   strings: violinIcon,
+  mute: muteIcon,
 };
 
 const scaleIcons = {
@@ -71,6 +73,7 @@ const customInstrumentNames = {
   floom: "Synthesizer",
   strings: "String Ensemble",
   synthflute: "Flute",
+  mute: 'Mute' // Label for mute
 };
 
 const customScaleNames = {
@@ -160,7 +163,7 @@ const TlDrawCanvasComponent = () => {
   const [scannedColumn, setScannedColumn] = useState(-1);
   const [previousColor, setPreviousColor] = useState(colors[0]);
   // const [bpm, setBpm] = useState(250); // Default BPM is 250
-  const [currentScale, setCurrentScale] = useState('melodicMinor'); // Default scale is harmonic minor
+  const [currentScale, setCurrentScale] = useState('pentatonicMinor'); // Default scale is harmonic minor
   const [currentDirection, setCurrentDirection] = useState('ascending'); // Default direction is ascending
   const [isScaleMenuOpen, setIsScaleMenuOpen] = useState(false); // Toggle for pop-up
   const { bpm, setBpm } = useBpm(); // Access bpm and setBpm from context
@@ -189,7 +192,7 @@ const TlDrawCanvasComponent = () => {
 
   // Define the available instrument options
   // const instrumentOptions = ['bass', 'epiano', 'floom', 'guitar', 'marimba', 'piano', 'strings', 'synthflute'];
-  const instrumentOptions = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'floom', 'strings', 'synthflute'];
+  const instrumentOptions = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'floom', 'strings', 'synthflute', 'mute'];
 
   // Inside your component
   const colorInstrumentMapRef = useRef(colorInstrumentMap); // Create a ref for instrument mappings
