@@ -15,3 +15,64 @@ export function getSvgPathFromStroke(stroke) {
   d.push("Z"); // Close the path
   return d.join(" "); // Return the generated SVG path as a string
 }
+
+// Function to open an IndexedDB database and create an object store if it doesn't exist
+export const openDB = (dbName, storeName) => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+
+    // This event is triggered if the database needs to be upgraded (e.g., when it's created)
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      db.createObjectStore(storeName); // Create an object store
+    };
+
+    // This event is triggered when the database is successfully opened
+    request.onsuccess = (event) => {
+      resolve(event.target.result); // Resolve the promise with the database instance
+    };
+
+    // This event is triggered if there's an error opening the database
+    request.onerror = (event) => {
+      reject(event.target.error); // Reject the promise with the error
+    };
+  });
+};
+
+// Function to get a value from the IndexedDB
+export const getFromDB = (db, storeName, key) => {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readonly'); // Start a read-only transaction
+    const store = transaction.objectStore(storeName); // Get the object store
+    const request = store.get(key); // Get the value by key
+
+    // This event is triggered when the value is successfully retrieved
+    request.onsuccess = (event) => {
+      resolve(event.target.result); // Resolve the promise with the retrieved value
+    };
+
+    // This event is triggered if there's an error retrieving the value
+    request.onerror = (event) => {
+      reject(event.target.error); // Reject the promise with the error
+    };
+  });
+};
+
+// Function to save a value to the IndexedDB
+export const saveToDB = (db, storeName, key, value) => {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readwrite'); // Start a read-write transaction
+    const store = transaction.objectStore(storeName); // Get the object store
+    const request = store.put(value, key); // Save the value with the specified key
+
+    // This event is triggered when the value is successfully saved
+    request.onsuccess = () => {
+      resolve(); // Resolve the promise
+    };
+
+    // This event is triggered if there's an error saving the value
+    request.onerror = (event) => {
+      reject(event.target.error); // Reject the promise with the error
+    };
+  });
+};

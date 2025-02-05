@@ -170,11 +170,11 @@ button {
 @media (max-height: 800px) {
   
 }
-
+/* 
 .grid-group {
   margin-top: 13px;
   margin-bottom: 0px;
-}
+} */
 
 .play-group {
   margin-top: 40px;
@@ -194,6 +194,7 @@ button {
 .redo,
 .play-stop-button,
 .grid-button,
+.dummy-button,
 .loop-button,
 .save-button,
 .load-button,
@@ -252,6 +253,7 @@ button {
 .play-stop-button:hover,
 .loop-button:hover,
 .grid-button:hover,
+..dummy-button:hover,
 .stop-mode:hover,
 .save-button:hover,
 .load-button:hover,
@@ -270,11 +272,9 @@ button {
     0 0 7px #ffc400;
 }
 
-.grid-button {
-  width: 2.9vw;
-}
 
 .grid-button:active,
+.dummy-button:active,
 .scale-button:active,
 .loop-button:active,
 .play-stop-button:active,

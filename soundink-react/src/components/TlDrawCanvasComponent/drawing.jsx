@@ -104,7 +104,7 @@ const options = {
     cap: true,
   },
   end: {
-    taper: 100,
+    taper: 20,
     easing: (t) => t,
     cap: true,
   },
@@ -152,18 +152,20 @@ const TlDrawCanvasComponent = () => {
   const [currentSize, setCurrentSize] = useState(30); // Currently selected brush size
   const [isEraser, setIsEraser] = useState(false); // Toggle for eraser mode
   const [isTrash, setIsTrash] = useState(false); // Toggle for trash mode
+  const [isPointerDown, setIsPointerDown] = useState(false);
+  const [trashLinePoints, setTrashLinePoints] = useState([]);
   const [undoStack, setUndoStack] = useState([]); // Stack for undo functionality
   const [redoStack, setRedoStack] = useState([]); // Stack for redo functionality
   const [currentColumn, setCurrentColumn] = useState(-1); // Current column being played back (for visual feedback)
   const intersectedDots = useRef({}); // Ref to track intersected dots
   const [showGrid, setShowGrid] = useState(true); // Add state to control grid visibility
   const [isPlaying, setIsPlaying] = useState(false); // To control playback state
-  const [loop, setLoop] = useState(false); // To control looping
+  const [loop, setLoop] = useState(true); // To control looping
   let playbackStopped = useRef(false); // To stop playback externally
   const [scannedColumn, setScannedColumn] = useState(-1);
   const [previousColor, setPreviousColor] = useState(colors[0]);
   // const [bpm, setBpm] = useState(250); // Default BPM is 250
-  const [currentScale, setCurrentScale] = useState('pentatonicMinor'); // Default scale is harmonic minor
+  const [currentScale, setCurrentScale] = useState('major'); // Default scale is harmonic minor
   const [currentDirection, setCurrentDirection] = useState('ascending'); // Default direction is ascending
   const [isScaleMenuOpen, setIsScaleMenuOpen] = useState(false); // Toggle for pop-up
   const { bpm, setBpm } = useBpm(); // Access bpm and setBpm from context
@@ -211,29 +213,88 @@ const TlDrawCanvasComponent = () => {
   const sidebarWidth = isMobile ? '15vw' : '10vw';
 
   // Function to save the current drawing
-  const handleSaveDrawing = () => {
-    const dataToSave = { lines, sonificationPoints };
+  // const handleSaveDrawing = () => {
+  //   const dataToSave = { lines, sonificationPoints };
 
+  //   const serializer = new XMLSerializer();
+  //   const svgString = serializer.serializeToString(svgRef.current);
+
+  //   const fileData = {
+  //     dataset: dataToSave,
+  //     svg: svgString,
+  //   };
+
+  //   const jsonBlob = new Blob([JSON.stringify(fileData)], { type: "application/json" });
+  //   const url = URL.createObjectURL(jsonBlob);
+
+  //   const a = document.createElement("a");
+  //   a.href = url;
+  //   a.download = "drawing.json";
+  //   a.click();
+
+  //   URL.revokeObjectURL(url);
+  // };
+
+  const handleSaveDrawing = () => {
+    const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+  
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svgRef.current);
-
+  
     const fileData = {
       dataset: dataToSave,
       svg: svgString,
     };
-
+  
     const jsonBlob = new Blob([JSON.stringify(fileData)], { type: "application/json" });
     const url = URL.createObjectURL(jsonBlob);
-
+  
     const a = document.createElement("a");
     a.href = url;
     a.download = "drawing.json";
     a.click();
-
+  
     URL.revokeObjectURL(url);
   };
 
-  // Function to load a drawing
+  // // Function to load a drawing
+  // const handleLoadDrawing = (e) => {
+  //   const file = e.target.files[0];
+  //   if (!file) return;
+  
+  //   const reader = new FileReader();
+  //   reader.onload = (event) => {
+  //     const jsonData = JSON.parse(event.target.result);
+  
+  //     if (jsonData.dataset) {
+  //       const loadedLines = jsonData.dataset.lines || [];
+  //       const loadedSonificationPoints = jsonData.dataset.sonificationPoints || [];
+  
+  //       // Update the state with loaded data
+  //       setLines(loadedLines);
+  //       setSonificationPoints(loadedSonificationPoints);
+  
+  //       // Rebuild intersectedDots to link sonification points for playback
+  //       const updatedIntersectedDots = {};
+  //       loadedLines.forEach((line) => {
+  //         if (line.intersections) {
+  //           Object.entries(line.intersections).forEach(([column, rows]) => {
+  //             if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
+  //             Object.entries(rows).forEach(([row, intersectionData]) => {
+  //               updatedIntersectedDots[column][row] = intersectionData;
+  //             });
+  //           });
+  //         }
+  //       });
+  
+  //       // Update the intersectedDots reference
+  //       intersectedDots.current = updatedIntersectedDots;
+  //     }
+  //   };
+  
+  //   reader.readAsText(file);
+  // };
+  
   const handleLoadDrawing = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -245,10 +306,12 @@ const TlDrawCanvasComponent = () => {
       if (jsonData.dataset) {
         const loadedLines = jsonData.dataset.lines || [];
         const loadedSonificationPoints = jsonData.dataset.sonificationPoints || [];
+        const loadedColorInstrumentMap = jsonData.dataset.colorInstrumentMap || {};
   
         // Update the state with loaded data
         setLines(loadedLines);
         setSonificationPoints(loadedSonificationPoints);
+        setColorInstrumentMap(loadedColorInstrumentMap);
   
         // Rebuild intersectedDots to link sonification points for playback
         const updatedIntersectedDots = {};
@@ -270,12 +333,18 @@ const TlDrawCanvasComponent = () => {
   
     reader.readAsText(file);
   };
-  
+
   const handleClickOutside = (event) => {
     // Check if the click is outside the scale menu
     if (scaleMenuRef.current && !scaleMenuRef.current.contains(event.target)) {
       setIsScaleMenuOpen(false); // Close the scale menu
     }
+  };
+
+  const handleClearScreen = () => {
+    setLines([]); // Clear all lines
+    setSonificationPoints([]); // Clear all sonification points
+    intersectedDots.current = {}; // Clear intersection data
   };
 
   useEffect(() => {
@@ -365,13 +434,6 @@ const TlDrawCanvasComponent = () => {
     setCurrentScale(selectedScale); // Update current scale for UI
     // setCurrentDirection(selectedScale)
     console.log('Selected scale:', currentScale);
-    // if (currentScale === 'major') {
-    //   setCurrentDirection('release');
-    // } else if (currentScale === 'harmonicMinor') {
-    //   setCurrentDirection('tension');
-    // } else if (currentScale === 'melodicMinor') {
-    //   setCurrentDirection('ascending');
-    // }
     setScale(selectedScale); // Update global scale
     setIsScaleMenuOpen(false); // Close the menu
   };
@@ -494,8 +556,15 @@ const TlDrawCanvasComponent = () => {
   const handlePointerDown = (e) => {
     e.target.setPointerCapture(e.pointerId);
     const clickPoint = [e.pageX, e.pageY];
-  
+
     if (isTrash) {
+      setIsPointerDown(true);
+      const { clientX, clientY } = e;
+      const canvasRect = svgRef.current.getBoundingClientRect();
+      const x = clientX - canvasRect.left;
+      const y = clientY - canvasRect.top;
+      setTrashLinePoints([[x, y]]);
+
       // Eraser mode: Check if the click intersects with any line's rendered stroke area
       const updatedLines = lines.filter((line) => {
         const isIntersected = line.points.some((startPoint, index) => {
@@ -544,11 +613,116 @@ const TlDrawCanvasComponent = () => {
     }
   };
 
+
+  // const handlePointerMove = (e) => {
+  //   if (e.buttons !== 1) return; // Only draw when mouse button is held down
+  //   const newPoint = [e.pageX, e.pageY, e.pressure];
+  
+  //   // if (isTrash) {
+  //   if (isTrash && isPointerDown) {
+  //     const { clientX, clientY } = e;
+  //     const canvasRect = svgRef.current.getBoundingClientRect();
+  //     const x = clientX - canvasRect.left;
+  //     const y = clientY - canvasRect.top;
+  //     setTrashLinePoints((prevPoints) => [...prevPoints, [x, y]]);
+    
+  //     // Check for intersections with lines
+  //     const newLines = lines.filter(line => {
+  //       return !line.points.some(([px, py]) => {
+  //         return trashLinePoints.some(([tx, ty]) => {
+  //           const distance = Math.sqrt((px - tx) ** 2 + (py - ty) ** 2);
+  //           return distance < 10; // Adjust the threshold as needed
+  //         });
+  //       });
+  //     });
+    
+  //     setLines(newLines);
+  //     // Eraser mode: remove sonification points that intersect with the eraser path
+  //     setLines((prevLines) =>
+  //       prevLines.map((line) => {
+  //         const updatedSonificationPoints = line.sonificationPoints.filter((point) => {
+  //           // Check if the current eraser point overlaps with this sonification point
+  //           return !isPointNearDot(newPoint[0], newPoint[1], point[0], point[1], currentSize, line.size);
+  //         });
+  
+  //         return {
+  //           ...line,
+  //           sonificationPoints: updatedSonificationPoints,
+  //         };
+  //       })
+  //     );
+  
+  //     // Update the sonification points state for real-time feedback
+  //     setSonificationPoints((prevPoints) =>
+  //       prevPoints.filter((point) => {
+  //         return !isPointNearDot(newPoint[0], newPoint[1], point[0], point[1], currentSize, currentSize);
+  //       })
+  //     );
+  
+  //     // Visually erase by drawing with the background color
+  //     setCurrentLine((prevLine) => [...prevLine, newPoint]);
+  //   } else {
+  //     // Regular drawing mode
+  //     setCurrentLine((prevLine) => [...prevLine, newPoint]);
+  //     setSonificationPoints((prevPoints) => {
+  //       // Interpolate points for smoother sonification
+  //       const lastPoint = prevPoints.length > 0 ? prevPoints[prevPoints.length - 1] : newPoint;
+  //       const distance = Math.hypot(newPoint[0] - lastPoint[0], newPoint[1] - lastPoint[1]);
+  //       const numInterpolatedPoints = Math.floor(distance / 5); // Adjust this value for more/less interpolation
+  //       const interpolatedPoints = interpolatePoints(lastPoint, newPoint, numInterpolatedPoints);
+  //       return [...prevPoints, ...interpolatedPoints, newPoint];
+  //     });
+  //   }
+  // };
+
   const handlePointerMove = (e) => {
     if (e.buttons !== 1) return; // Only draw when mouse button is held down
     const newPoint = [e.pageX, e.pageY, e.pressure];
   
-    if (isTrash) {
+    if (isTrash && isPointerDown) {
+      const { clientX, clientY } = e;
+      const canvasRect = svgRef.current.getBoundingClientRect();
+      const x = clientX - canvasRect.left;
+      const y = clientY - canvasRect.top;
+      setTrashLinePoints((prevPoints) => [...prevPoints, [x, y]]);
+  
+      // Check for intersections with lines
+      const updatedLines = lines.filter(line => {
+        const isIntersected = line.points.some(([px, py]) => {
+          return trashLinePoints.some(([tx, ty]) => {
+            const distance = Math.sqrt((px - tx) ** 2 + (py - ty) ** 2);
+            return distance < 10; // Adjust the threshold as needed
+          });
+        });
+  
+        if (isIntersected) {
+          const lineId = line.lineId;
+  
+          // Add the erased line to the undo stack
+          setUndoStack((prev) => [...prev, { lines, sonificationPoints }]);
+  
+          // Remove intersections from intersectedDots
+          for (const column in intersectedDots.current) {
+            for (const row in intersectedDots.current[column]) {
+              if (intersectedDots.current[column][row].lineId === lineId) {
+                delete intersectedDots.current[column][row];
+              }
+            }
+          }
+  
+          // Stop associated sounds
+          stopSoundsForLine(lineId);
+        }
+  
+        return !isIntersected; // Keep non-erased lines
+      });
+  
+      // Update lines and sonification points
+      const remainingSonificationPoints = updatedLines.flatMap((line) => line.sonificationPoints);
+      setLines(updatedLines);
+      setSonificationPoints(remainingSonificationPoints);
+      setRedoStack([]); // Clear redo stack after erasing
+    } else if (isTrash) {
       // Eraser mode: remove sonification points that intersect with the eraser path
       setLines((prevLines) =>
         prevLines.map((line) => {
@@ -589,6 +763,11 @@ const TlDrawCanvasComponent = () => {
 
   const handlePointerUp = () => {
     if (isTrash) {
+      //TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING
+      setIsPointerDown(false);
+      setTrashLinePoints([]); // Clear the trash line points
+      //TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING
+
       // "Soft" eraser mode: Erase only sonification points locally without deleting entire lines
       setLines((prevLines) =>
         prevLines.map((line) => {
@@ -804,23 +983,7 @@ const handlePlay = async () => {
 return (
   <div className="main-container">
     <div  className="controls">
-      
-{/* 
-    <div className="custom-slider-buttons-group">
-      <input
-        type="range"
-        min="1"
-        max="100"
-        step="1"
-        className="custom-vertical-slider"
-      />
-      <div className="stacked-buttons">
-        <button className="stacked-button">+</button>
-        <button className="stacked-button">0</button>
-        <button className="stacked-button">-</button>
-      </div>
-    </div> */}
-
+  
       <div className="play-group">
         <button
             ref={playStopButtonRef} // Add a ref here
@@ -891,7 +1054,6 @@ return (
               setBpm(bpmValue); // Set BPM in state
               const playbackSpeedValue = Math.round(60000 / bpmValue); // Convert BPM to delay in ms
               setPlaybackSpeed(playbackSpeedValue); // Update playback speed
-              // console.log("Current BPM:", bpmValue, "Playback Speed (ms):", playbackSpeedValue);
             }}
           />
         </div>
@@ -903,12 +1065,7 @@ return (
             <button
               // className="color-button"
               className={`color-button ${currentColor === color ? 'active' : ''}`} // Add active class
-              // style={{ backgroundColor: isEraser ? ERASER_COLOR : color }}
               style={{ backgroundColor: isEraser ? color : color }}
-              // onClick={() => {
-              //   setCurrentColor(isEraser ? ERASER_COLOR : color);
-              //   setIsEraser(false);
-              // }}
               onClick={() => {
                 setCurrentColor(color); // Set the selected color
                 setIsEraser(false);     // Deactivate eraser
@@ -994,11 +1151,15 @@ return (
           <img src={uploadIcon} alt="Upload Icon" className="iconUp" />
         </button>
       </div>
-      
+
       {/* Toggle Grid Visibility Button */}
       <div className="grid-group">
         <button className="grid-button" onClick={toggleGrid}>
           <img src={GridIcon} alt="Grid Icon" className="iconGrid" />
+        </button>
+        {/* Dummy button */}
+        <button className="dummy-button" onClick={handleClearScreen}>
+          <img src={GridIcon} alt="Dummy Icon" className="iconGrid" />
         </button>
       </div>
 
@@ -1023,75 +1184,28 @@ return (
 
       {/* SVG Drawing Area */}
       <svg
+        ref={svgRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         style={{ touchAction: 'none', width: '100%', height: '100%' }}
       >
 
+        {/* TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING */}
+        {isTrash && trashLinePoints.length > 0 && (
+          <path
+            d={getSvgPathFromStroke(trashLinePoints)}
+            stroke='#eae6e1'
+            strokeWidth={5}
+            fill="none"
+          />
+        )}
+        {/* TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING */}
+
         {allStrokes}
         {currentLine.length > 0 && <path d={currentStroke} fill={currentColor} />}
       </svg>
     </div>
-
-    {/* Instrument Selection Modal */}
-    {/* {selectedColor && (
-      <div ref={instrumentMenuRef} className="instrument-selection-modal">
-        <div className="instrument-options-grid">
-          {instrumentOptions.map((instrument, index) => (
-            <div key={index} className="instrument-option-cell">
-              <button
-                onClick={() => updateInstrumentForColor(instrument)}
-                className="instrument-option-button"
-              >
-                <img
-                  src={instrumentIcons[instrument]}
-                  alt={instrument}
-                  className="instrument-icon"
-                />
-              </button>
-              <span className="instrument-label">
-                {customInstrumentNames[instrument]}
-              </span>
-            </div>
-          ))}
-        </div>
-        <button onClick={closeInstrumentMenu} className="close-modal-button">
-          <img src={quitIcon} alt="Close" className="iconQuit" />
-        </button>
-      </div>
-    )} */}
-
-    {/* Scale Selection Modal */}
-    {/* {isScaleMenuOpen && (
-      <div ref={scaleMenuRef} className="scale-selection-modal">
-        <div className="scale-options-vertical">
-          {Object.keys(scaleIcons).map((scale) => (
-            <div key={scale} className="scale-option-row">
-              <button
-                className="scale-option-button"
-                onClick={() => handleScaleChange(scale)}
-              >
-                <img
-                  src={scaleIcons[scale]}
-                  alt={`${scale} icon`}
-                  className="scale-option-icon"
-                />
-              </button>
-              <span className="scale-label">
-                {customScaleNames[scale]}
-              </span>
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={() => setIsScaleMenuOpen(false)}
-          className="close-modal-button"
-        >
-          <img src={quitIcon} alt="Close" className="iconQuit" />
-        </button>
-      </div>
-    )} */}
 
     {/* Instrument Selection Modal */}
     {selectedColor && (
@@ -1149,7 +1263,6 @@ return (
         </div>
       </div>
     )}
-
 
     {isLoading && (
       <div className="loading-popup">

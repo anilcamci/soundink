@@ -1,5 +1,9 @@
 import { mapNoteToSampleNumber, mapColorToInstrumentFolder } from './soundMappings'; // Import both mappings
 import { useBpm } from './BpmContext'; // Import the BPM context
+import { openDB, getFromDB, saveToDB } from './utils';
+
+const DB_NAME = 'SoundCache';
+const STORE_NAME = 'AudioBuffers';
 
 // List of instruments and the number of sound files for each
 const instruments = {
@@ -56,17 +60,42 @@ masterGainNode.connect(limiterNode);
 limiterNode.connect(audioCtx.destination);
 
 // Updated Preload Function
+// export const preloadSounds = async () => {
+//   const soundFiles = generateSoundFiles(); // Generate all sound file paths dynamically
+//   try {
+//     for (const filePath of soundFiles) {
+//       if (!bufferCache[filePath]) {
+//         const response = await fetch(filePath);
+//         const arrayBuffer = await response.arrayBuffer();
+//         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+//         bufferCache[filePath] = audioBuffer; // Store in cache
+//         console.log(`Preloaded: ${filePath}`);
+//       }
+//     }
+//   } catch (error) {
+//     console.error('Error preloading sounds:', error);
+//   }
+// };
+
 export const preloadSounds = async () => {
   const soundFiles = generateSoundFiles(); // Generate all sound file paths dynamically
+  const db = await openDB(DB_NAME, STORE_NAME);
+
   try {
     for (const filePath of soundFiles) {
-      if (!bufferCache[filePath]) {
+      let audioBuffer = await getFromDB(db, STORE_NAME, filePath);
+
+      if (!audioBuffer) {
         const response = await fetch(filePath);
         const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        bufferCache[filePath] = audioBuffer; // Store in cache
-        console.log(`Preloaded: ${filePath}`);
+        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        await saveToDB(db, STORE_NAME, filePath, audioBuffer);
+        console.log(`Preloaded and cached: ${filePath}`);
+      } else {
+        console.log(`Loaded from cache: ${filePath}`);
       }
+
+      bufferCache[filePath] = audioBuffer; // Store in memory cache
     }
   } catch (error) {
     console.error('Error preloading sounds:', error);

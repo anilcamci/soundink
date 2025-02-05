@@ -24,6 +24,14 @@ function App() {
     loadSounds(); // Call the function
   }, []); // Empty dependency array ensures this runs only once when the component mounts
 
+  // Lock the screen to prevent scrolling
+  useEffect(() => {
+    document.body.classList.add('lock-scroll');
+    return () => {
+      document.body.classList.remove('lock-scroll');
+    };
+  }, []);
+
   return (
     <PlaybackSpeedProvider> {/* Wrap your app with PlaybackSpeedProvider */}
       <BpmProvider>
