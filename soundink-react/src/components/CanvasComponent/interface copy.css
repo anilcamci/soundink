@@ -22,6 +22,7 @@
   padding: 20px 10px;
   background: linear-gradient(90deg, #4e76bb 0%, #4e76bb 100%);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  /* box-sizing: border-box; */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -46,10 +47,12 @@
 .tldraw-container {
   flex-grow: 1;
   display: flex;
+  flex-direction: column;
   position: relative;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  box-sizing: border-box;
   background-color: #eae6e1;
   z-index: 1;
 }
@@ -194,7 +197,7 @@ button {
 .redo,
 .play-stop-button,
 .grid-button,
-.dummy-button,
+.clean-button,
 .loop-button,
 .save-button,
 .load-button,
@@ -253,7 +256,7 @@ button {
 .play-stop-button:hover,
 .loop-button:hover,
 .grid-button:hover,
-..dummy-button:hover,
+.clean-button:hover,
 .stop-mode:hover,
 .save-button:hover,
 .load-button:hover,
@@ -274,7 +277,7 @@ button {
 
 
 .grid-button:active,
-.dummy-button:active,
+.clean-button:active,
 .scale-button:active,
 .loop-button:active,
 .play-stop-button:active,
@@ -456,6 +459,7 @@ button {
 .iconLoop,
 .noLoop,
 .iconGrid,
+.iconClean,
 .iconTempo,
 .iconEraser,
 .iconTrash,
@@ -489,6 +493,10 @@ button {
   transform: scale(1);
 }
 
+.iconClean {
+  transform: scale(0.8);
+}
+
 .iconQuit {
   transform: scale(1.8);
 }
@@ -512,6 +520,7 @@ button {
 button:hover .iconStop, button.active .iconStop, .iconStop,
 button:hover .iconDo,
 button:hover .iconGrid,
+button:hover .iconClean,
 button:hover .iconQuit,
 button:hover .iconEraser, button.active .iconEraser,
 button:hover .iconTrash, button.active .iconTrash,
@@ -1119,4 +1128,113 @@ button:hover .instrument-sidebar-icon {
   margin-top: 8px;
   color: #ffc400;
   text-align: center;
+}
+
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.popup-buttons {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 20px;
+}
+
+.popup-buttons button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.popup-buttons button:hover {
+  background: #ddd;
+}
+
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.popup-buttons {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 20px;
+}
+
+.popup-buttons button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.popup-buttons button:hover {
+  background: #ddd;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.loading-content {
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.loading-spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #000;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

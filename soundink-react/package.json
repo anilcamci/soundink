@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "canvg": "^4.0.2",
     "p5": "^1.11.0",
     "perfect-freehand": "^1.2.2",
     "prop-types": "^15.8.1",

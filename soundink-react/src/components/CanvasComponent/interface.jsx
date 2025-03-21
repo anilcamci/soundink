@@ -1,149 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react';
-import { getStroke } from 'perfect-freehand'; // Used to calculate stroke paths for drawing
-import './drawing.css'; // Importing the associated CSS file for styles
-import { getSvgPathFromStroke } from './utils'; // Utility function to convert stroke to SVG path
-import { getMapRowToNote, setScale } from './soundMappings'; // Function to map rows to musical notes
-import { playSound } from './soundPlayer'; // Function to play the sound associated with each note/color
-import { PlaybackSpeedProvider, usePlaybackSpeed } from './playbackSpeedContext'; // Context for playback speed
-import { stopSoundsForLine, preloadSounds } from './soundPlayer';
-import { v4 as uuidv4 } from 'uuid'; // To generate unique IDs
-import GridCanvas from '../GridComponent/grid';
-import { firstColumn, fistColumnScan, numDotsX, numDotsY, dotRadius } from '../GridComponent/gridConfig';
-import { useMediaQuery } from 'react-responsive';
-import { useBpm } from './BpmContext'; // Import the BPM context
-// import { scales, getDirection, getScaleForDirection } from './soundMappings';
+import './interface.css'; // Importing the associated CSS file for styles
+import { PlayIcon, StopIcon, UndoIcon, RedoIcon, BrushIcon, EraseIcon, LoopIcon, TempoIcon, GridIcon, TrashIcon, quitIcon, NoLoopIcon, downloadIcon, uploadIcon, CleanIcon, muteIcon, bassIcon, guitarIcon, marimbaIcon, pianoIcon, violinIcon, fluteIcon, glassIcon, synthIcon, majorIcon, harmonicMinorIcon, melodicMinorIcon, minorPentatonicIcon, majorPentatonicIcon, instrumentIcons, scaleIcons, customInstrumentNames, customScaleNames, colors, sizes, MAX_DELAY, ERASER_COLOR, options, isPointNearDot, isPointNearLineSegment, useBpm, usePlaybackSpeed, useMediaQuery, uuidv4, stopSoundsForLine, preloadSounds, getSvgPathFromStroke, getStroke, getMapRowToNote, setScale, playSound, GridCanvas, firstColumn, fistColumnScan, numDotsX, numDotsY, dotRadius, canvasDimensions } from './import'; // Importing the necessary functions and constants from the import file
+import { Canvg } from 'canvg';
 
-import PlayIcon from './../../assets/icons/play-svgrepo-com-3.svg';
-import StopIcon from './../../assets/icons/stop-svgrepo-com-3.svg';
-import UndoIcon from './../../assets/icons/undo-xs-svgrepo-com-3.svg';
-import RedoIcon from './../../assets/icons/redo-xs-svgrepo-com-3.svg';
-import BrushIcon from './../../assets/icons/brush-svgrepo-com-2 copy.svg';
-import EraseIcon from './../../assets/icons/eraser-svgrepo-com-3.svg';
-import LoopIcon from './../../assets/icons/loop-svgrepo-com-6.svg';
-import TempoIcon from './../../assets/icons/metronome-tempo-beat-bpm-svgrepo-com-2.svg';
-import GridIcon from './../../assets/icons/grid-circles-svgrepo-com-3.svg';
-import TrashIcon from './../../assets/icons/trash-svgrepo-com-2.svg';
-import quitIcon from './../../assets/icons/close-delete-remove-trash-cancel-cross-svgrepo-com.svg';
-import NoLoopIcon from './../../assets/icons/one-finger-svgrepo-com.svg';
-import downloadIcon from './../../assets/icons/download-square-svgrepo-com.svg';
-import uploadIcon from './../../assets/icons/upload-square-svgrepo-com.svg';
-
-import muteIcon from './../../assets/icons/mute-silent-volume-sound-off-svgrepo-com.svg';
-import bassIcon from './../../assets/icons/bass-svgrepo-com-3.svg';
-import guitarIcon from './../../assets/icons/guitar-svgrepo-com-5.svg';
-import marimbaIcon from './../../assets/icons/xylophone-svgrepo-com-6.svg';
-import pianoIcon from './../../assets/icons/piano-svgrepo-com-3.svg';
-import violinIcon from './../../assets/icons/violin-svgrepo-com-3.svg';
-import fluteIcon from './../../assets/icons/flute-svgrepo-com-5.svg';
-import glassIcon from './../../assets/icons/glass-svgrepo-com-7.svg';
-import synthIcon from './../../assets/icons/keyboard-piano-synth-midi-vst-svgrepo-com-3.svg';
-import majorIcon from './../../assets/icons/sun-2-svgrepo-com-6.svg';
-import harmonicMinorIcon from './../../assets/icons/moon-fog-svgrepo-com-3.svg';
-import melodicMinorIcon from './../../assets/icons/saturn-science-svgrepo-com-3.svg';
-import minorPentatonicIcon from './../../assets/icons/five-stars-quality-symbol-svgrepo-com.svg';
-import majorPentatonicIcon from './../../assets/icons/star-rings-svgrepo-com.svg';
-
-
-const instrumentIcons = {
-  floom: synthIcon,
-  epiano: glassIcon,
-  synthflute: fluteIcon,
-  bass: bassIcon,
-  guitar: guitarIcon,
-  marimba: marimbaIcon,
-  piano: pianoIcon,
-  strings: violinIcon,
-  mute: muteIcon,
-};
-
-const scaleIcons = {
-  major: majorIcon,
-  harmonicMinor: harmonicMinorIcon,
-  melodicMinor: melodicMinorIcon,
-  pentatonicMajor: minorPentatonicIcon,
-  pentatonicMinor: majorPentatonicIcon,
-};
-
-const customInstrumentNames = {
-  piano: "Piano",
-  marimba: "Marimba",
-  bass: "Bass",
-  guitar: "Guitar",
-  epiano: "Glass Harp",
-  floom: "Synthesizer",
-  strings: "String Ensemble",
-  synthflute: "Flute",
-  mute: 'Mute' // Label for mute
-};
-
-const customScaleNames = {
-  major: "Major Scale",
-  harmonicMinor: "Harmonic Minor",
-  melodicMinor: "Melodic Minor",
-  pentatonicMajor: "Pentatonic Major",
-  pentatonicMinor: "Pentatonic Minor",
-};
-
-// Constants for brush colors and sizes
-const colors = ['#161a1d', '#ffb703', '#219ebc', '#9a031e', '#006400'];
-
-const sizes = [25, 50];
-const MAX_DELAY = 600; // Maximum delay in milliseconds for the slowest speed
-
-const ERASER_COLOR = '#eae6e1'; // Choose a color that represents the eraser
-// Options for stroke drawing (customizable for smoothness, taper, etc.)
-const options = {
-  size: 16,
-  thinning: 0.5,
-  smoothing: 0.5,
-  streamline: 0.5,
-  easing: (t) => t,
-  start: {
-    taper: 0,
-    easing: (t) => t,
-    cap: true,
-  },
-  end: {
-    taper: 20,
-    easing: (t) => t,
-    cap: true,
-  },
-};
-
-// Helper function to check if a point (from a line) is close enough to a dot
-const isPointNearDot = (pointX, pointY, dotX, dotY, dotRadius, lineThickness) => {
-  const distance = Math.hypot(pointX - dotX, pointY - dotY);
-  // Include both dotRadius and line thickness in the intersection threshold
-  return distance <= dotRadius + lineThickness / 2;
-};
-
-const isPointNearLineSegment = (point, start, end, strokeWidth) => {
-  const [px, py] = point;
-  const [sx, sy] = start;
-  const [ex, ey] = end;
-
-  // Calculate the distance from the point to the line segment
-  const lineLengthSquared = (ex - sx) ** 2 + (ey - sy) ** 2;
-  if (lineLengthSquared === 0) {
-    // The line segment is a single point
-    return Math.hypot(px - sx, py - sy) <= strokeWidth / 2;
-  }
-
-  // Project the point onto the line segment
-  let t = ((px - sx) * (ex - sx) + (py - sy) * (ey - sy)) / lineLengthSquared;
-  t = Math.max(0, Math.min(1, t)); // Clamp t to the segment [0, 1]
-
-  const closestPointX = sx + t * (ex - sx);
-  const closestPointY = sy + t * (ey - sy);
-
-  // Calculate the distance from the point to the closest point on the line segment
-  const distance = Math.hypot(px - closestPointX, py - closestPointY);
-
-  // Check if the distance is within the stroke width
-  return distance <= strokeWidth / 2;
-};
-
-const TlDrawCanvasComponent = () => {
+const CanvasComponent = () => {
   const { playbackSpeed, setPlaybackSpeed } = usePlaybackSpeed(); // Access playbackSpeed
   const [sonificationPoints, setSonificationPoints] = useState([]); // Points that trigger sounds
   const [lines, setLines] = useState([]); // List of drawn lines
@@ -164,17 +24,20 @@ const TlDrawCanvasComponent = () => {
   let playbackStopped = useRef(false); // To stop playback externally
   const [scannedColumn, setScannedColumn] = useState(-1);
   const [previousColor, setPreviousColor] = useState(colors[0]);
-  // const [bpm, setBpm] = useState(250); // Default BPM is 250
   const [currentScale, setCurrentScale] = useState('major'); // Default scale is harmonic minor
-  const [currentDirection, setCurrentDirection] = useState('ascending'); // Default direction is ascending
   const [isScaleMenuOpen, setIsScaleMenuOpen] = useState(false); // Toggle for pop-up
   const { bpm, setBpm } = useBpm(); // Access bpm and setBpm from context
   const scaleMenuRef = useRef(null); // Ref for the scale menu
   const instrumentMenuRef = useRef(null); // Ref for the instrument menu
   const originalSvgSize = useRef({ width: window.innerWidth, height: window.innerHeight });
   const [isLoading, setIsLoading] = useState(true); // Initial loading state
+  const [isDownloading, setIsDownloading] = useState(false); // State for downloading files
+  const [isClearScreenPopupVisible, setIsClearScreenPopupVisible] = useState(false);
+  const [isSavePopupVisible, setIsSavePopupVisible] = useState(false);
   const svgRef = useRef();
   let loadInputRef = null; // Create a ref for the hidden input element
+  const clearScreenPopupRef = useRef(null);
+  const savePopupRef = useRef(null);
 
   // Add this at the top of your component, along with other state variables
   const [selectedColor, setSelectedColor] = useState(null); // Track the color for which the modal is shown
@@ -193,7 +56,6 @@ const TlDrawCanvasComponent = () => {
   });
 
   // Define the available instrument options
-  // const instrumentOptions = ['bass', 'epiano', 'floom', 'guitar', 'marimba', 'piano', 'strings', 'synthflute'];
   const instrumentOptions = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'floom', 'strings', 'synthflute', 'mute'];
 
   // Inside your component
@@ -212,30 +74,122 @@ const TlDrawCanvasComponent = () => {
   const gapSize = isMobile ? '10px' : isTablet ? '15px' : '20px';
   const sidebarWidth = isMobile ? '15vw' : '10vw';
 
-  // Function to save the current drawing
-  // const handleSaveDrawing = () => {
-  //   const dataToSave = { lines, sonificationPoints };
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    const stateToSave = {
+      lines,
+      sonificationPoints,
+      colorInstrumentMap,
+      currentColor,
+      currentSize,
+      isEraser,
+      isTrash,
+      undoStack,
+      redoStack,
+      showGrid,
+      loop,
+      bpm,
+      playbackSpeed,
+      currentScale,
+    };
+    // console.log('Saving state to localStorage:', stateToSave);
+    localStorage.setItem('soundinkState', JSON.stringify(stateToSave));
+  }, [
+    lines,
+    sonificationPoints,
+    colorInstrumentMap,
+    currentColor,
+    currentSize,
+    isEraser,
+    isTrash,
+    undoStack,
+    redoStack,
+    showGrid,
+    loop,
+    bpm,
+    playbackSpeed,
+    currentScale,
+  ]);
+    
+  // Load state from localStorage when the component mounts
+  useEffect(() => {
+    const savedState = localStorage.getItem('soundinkState');
+    if (savedState) {
+      const {
+        lines,
+        sonificationPoints,
+        colorInstrumentMap,
+        currentColor,
+        currentSize,
+        isEraser,
+        isTrash,
+        undoStack,
+        redoStack,
+        showGrid,
+        loop,
+        bpm,
+        playbackSpeed,
+        currentScale,
+      } = JSON.parse(savedState);
 
-  //   const serializer = new XMLSerializer();
-  //   const svgString = serializer.serializeToString(svgRef.current);
+      // console.log('Loading state from localStorage:', savedState);
 
-  //   const fileData = {
-  //     dataset: dataToSave,
-  //     svg: svgString,
-  //   };
+      setLines(lines);
+      setSonificationPoints(sonificationPoints);
+      setColorInstrumentMap(colorInstrumentMap);
+      setCurrentColor(currentColor);
+      setCurrentSize(currentSize);
+      setIsEraser(isEraser);
+      setIsTrash(isTrash);
+      setUndoStack(undoStack);
+      setRedoStack(redoStack);
+      setShowGrid(showGrid);
+      setLoop(loop);
+      setBpm(bpm);
+      setPlaybackSpeed(playbackSpeed);
+      setCurrentScale(currentScale);
 
-  //   const jsonBlob = new Blob([JSON.stringify(fileData)], { type: "application/json" });
-  //   const url = URL.createObjectURL(jsonBlob);
+      // Rebuild intersectedDots to link sonification points for playback
+      const updatedIntersectedDots = {};
+      lines.forEach((line) => {
+        if (line.intersections) {
+          Object.entries(line.intersections).forEach(([column, rows]) => {
+            if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
+            Object.entries(rows).forEach(([row, intersectionData]) => {
+              updatedIntersectedDots[column][row] = intersectionData;
+            });
+          });
+        }
+      });
 
-  //   const a = document.createElement("a");
-  //   a.href = url;
-  //   a.download = "drawing.json";
-  //   a.click();
+      // Update the intersectedDots reference
+      intersectedDots.current = updatedIntersectedDots;
 
-  //   URL.revokeObjectURL(url);
-  // };
+      // console.log('State loaded and intersectedDots rebuilt:', updatedIntersectedDots);
+    }
+  }, []);
+
 
   const handleSaveDrawing = () => {
+    setIsSavePopupVisible(true);
+  };
+
+  const handleSave = async ({ saveJson, saveImage, saveAudio }) => {
+    if (saveJson) {
+      confirmSaveAsJson();
+    }
+    if (saveImage) {
+      confirmSaveAsImage();
+    }
+    if (saveAudio) {
+      await confirmSaveAsAudio();
+    }
+
+    setIsDownloading(false);
+    setIsSavePopupVisible(false); // Hide the pop-up after saving
+  };
+
+  const confirmSaveDrawing = () => {
     const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
   
     const serializer = new XMLSerializer();
@@ -255,45 +209,143 @@ const TlDrawCanvasComponent = () => {
     a.click();
   
     URL.revokeObjectURL(url);
+    // setIsSavePopupVisible(false); // Hide the pop-up
+  };
+  
+  // const cancelSaveDrawing = () => {
+  //   setIsSavePopupVisible(false); // Hide the pop-up
+  // };
+
+  const confirmSaveAsJson = () => {
+    const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+  
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgRef.current);
+  
+    const fileData = {
+      dataset: dataToSave,
+      svg: svgString,
+    };
+  
+    const jsonBlob = new Blob([JSON.stringify(fileData)], { type: "application/json" });
+    const url = URL.createObjectURL(jsonBlob);
+  
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "drawing.json";
+    a.click();
+  
+    URL.revokeObjectURL(url);
+    // setIsSavePopupVisible(false); // Hide the pop-up
   };
 
-  // // Function to load a drawing
-  // const handleLoadDrawing = (e) => {
-  //   const file = e.target.files[0];
-  //   if (!file) return;
+  const confirmSaveAsImage = async () => {
+    const svgElement = svgRef.current;
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgElement);
   
-  //   const reader = new FileReader();
-  //   reader.onload = (event) => {
-  //     const jsonData = JSON.parse(event.target.result);
+    // console.log("Serialized SVG String:", svgString);
   
-  //     if (jsonData.dataset) {
-  //       const loadedLines = jsonData.dataset.lines || [];
-  //       const loadedSonificationPoints = jsonData.dataset.sonificationPoints || [];
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
   
-  //       // Update the state with loaded data
-  //       setLines(loadedLines);
-  //       setSonificationPoints(loadedSonificationPoints);
+    const svgSize = svgElement.getBoundingClientRect();
+    canvas.width = svgSize.width;
+    canvas.height = svgSize.height;
   
-  //       // Rebuild intersectedDots to link sonification points for playback
-  //       const updatedIntersectedDots = {};
-  //       loadedLines.forEach((line) => {
-  //         if (line.intersections) {
-  //           Object.entries(line.intersections).forEach(([column, rows]) => {
-  //             if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
-  //             Object.entries(rows).forEach(([row, intersectionData]) => {
-  //               updatedIntersectedDots[column][row] = intersectionData;
-  //             });
-  //           });
-  //         }
-  //       });
+    // Draw a white background
+    ctx.fillStyle = '#eae6e1';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  //       // Update the intersectedDots reference
-  //       intersectedDots.current = updatedIntersectedDots;
-  //     }
-  //   };
+    // Use Canvg to render the SVG onto the canvas
+    const v = await Canvg.fromString(ctx, svgString, {
+      ignoreDimensions: true,
+      ignoreClear: true,
+    });
   
-  //   reader.readAsText(file);
-  // };
+    // Render the SVG onto the canvas
+    await v.render();
+  
+    const imgURL = canvas.toDataURL("image/png");
+  
+    const a = document.createElement("a");
+    a.href = imgURL;
+    a.download = "drawing.png";
+    a.click();
+  };
+  
+  const confirmSaveAsAudio = async () => {
+    // console.log("Starting audio recording...");
+  
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const destination = audioContext.createMediaStreamDestination();
+    const recorder = new MediaRecorder(destination.stream);
+    const chunks = [];
+    // const recorder = new MediaRecorder(stream, {mimeType: 'audio/wav'});
+  
+    recorder.ondataavailable = (event) => {
+      chunks.push(event.data);
+    };
+  
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'audio/mp3' });
+      const url = URL.createObjectURL(blob);
+  
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sonification.mp3';
+      a.click();
+  
+      URL.revokeObjectURL(url);
+      // console.log("Audio recording saved.");
+    };
+  
+    recorder.start();
+    // console.log("Recorder started.");
+  
+    // Play the sonification points without looping
+    for (let column = firstColumn; column < numDotsX; column++) {
+      if (intersectedDots.current[column]) {
+        const playPromises = [];
+        for (const row in intersectedDots.current[column]) {
+          const { color } = intersectedDots.current[column][row];
+          const mapRowToNote = getMapRowToNote();
+          const note = mapRowToNote[row];
+  
+          playPromises.push(
+            playSound(
+              color,
+              note,
+              1,
+              playbackSpeedRef.current,
+              intersectedDots.current[column][row].lineId,
+              colorInstrumentMapRef.current,
+              false,
+              audioContext,
+              destination
+            )
+          );
+        }
+        await Promise.all(playPromises);
+      }
+  
+      await new Promise(resolve =>
+        setTimeout(resolve, playbackSpeedRef.current)
+      );
+    }
+  
+    // Ensure all audio is played before stopping the recorder
+    const totalDuration = playbackSpeedRef.current * numDotsX;
+    setTimeout(() => {
+      recorder.stop();
+      // console.log("Recorder stopped.");
+      // setIsSavePopupVisible(false); // Hide the pop-up
+    }, totalDuration);
+  };
+  
+  const cancelSaveDrawing = () => {
+    setIsSavePopupVisible(false); // Hide the pop-up
+  };
   
   const handleLoadDrawing = (e) => {
     const file = e.target.files[0];
@@ -341,10 +393,31 @@ const TlDrawCanvasComponent = () => {
     }
   };
 
+  const handleClickOutsideClearScreen = (event) => {
+    if (clearScreenPopupRef.current && !clearScreenPopupRef.current.contains(event.target)) {
+      setIsClearScreenPopupVisible(false);
+    }
+  };
+
+  const handleClickOutsideSave = (event) => {
+    if (savePopupRef.current && !savePopupRef.current.contains(event.target)) {
+      setIsSavePopupVisible(false);
+    }
+  };
+
   const handleClearScreen = () => {
+    setIsClearScreenPopupVisible(true);
+  };
+
+  const confirmClearScreen = () => {
     setLines([]); // Clear all lines
     setSonificationPoints([]); // Clear all sonification points
     intersectedDots.current = {}; // Clear intersection data
+    setIsClearScreenPopupVisible(false); // Hide the pop-up
+  };
+  
+  const cancelClearScreen = () => {
+    setIsClearScreenPopupVisible(false); // Hide the pop-up
   };
 
   useEffect(() => {
@@ -354,6 +427,26 @@ const TlDrawCanvasComponent = () => {
     };
     loadSounds();
   }, []);
+
+  useEffect(() => {
+    if (isClearScreenPopupVisible) {
+      document.addEventListener("mousedown", handleClickOutsideClearScreen);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutsideClearScreen);
+    }
+
+    return () => document.removeEventListener("mousedown", handleClickOutsideClearScreen);
+  }, [isClearScreenPopupVisible]);
+
+  useEffect(() => {
+    if (isSavePopupVisible) {
+      document.addEventListener("mousedown", handleClickOutsideSave);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutsideSave);
+    }
+
+    return () => document.removeEventListener("mousedown", handleClickOutsideSave);
+  }, [isSavePopupVisible]);
 
   useEffect(() => {
     if (isScaleMenuOpen) {
@@ -433,7 +526,7 @@ const TlDrawCanvasComponent = () => {
   const handleScaleChange = (selectedScale) => {
     setCurrentScale(selectedScale); // Update current scale for UI
     // setCurrentDirection(selectedScale)
-    console.log('Selected scale:', currentScale);
+    // console.log('Selected scale:', currentScale);
     setScale(selectedScale); // Update global scale
     setIsScaleMenuOpen(false); // Close the menu
   };
@@ -511,29 +604,61 @@ const TlDrawCanvasComponent = () => {
     return updatedDots;
   };
 
-  const handleResize = () => {
-    const newWidth = window.innerWidth;
-    const newHeight = window.innerHeight;
+  // const handleResize = () => {
+  //   const newWidth = window.innerWidth;
+  //   const newHeight = window.innerHeight;
   
+  //   // Calculate scale factors
+  //   const scaleX = newWidth / originalSvgSize.current.width;
+  //   const scaleY = newHeight / originalSvgSize.current.height;
+  
+  //   // Update each line's points
+  //   const resizedLines = lines.map((line) => ({
+  //     ...line,
+  //     points: line.points.map(([x, y]) => [x * scaleX, y * scaleY]), // Scale points
+  //   }));
+  
+  //   // Update `lines` with resized data
+  //   setLines(resizedLines);
+  
+  //   // Recalculate the positions of sonification dots
+  //   intersectedDots.current = alignDotsToGrid(scaleX, scaleY);
+  
+  //   // Update the original size
+  //   originalSvgSize.current = { width: newWidth, height: newHeight };
+  // };
+
+  const handleResize = () => {
+    const container = document.querySelector('.canvas-container');
+    const newWidth = container.clientWidth;
+    const newHeight = container.clientHeight;
+
     // Calculate scale factors
     const scaleX = newWidth / originalSvgSize.current.width;
     const scaleY = newHeight / originalSvgSize.current.height;
-  
+
     // Update each line's points
     const resizedLines = lines.map((line) => ({
-      ...line,
-      points: line.points.map(([x, y]) => [x * scaleX, y * scaleY]), // Scale points
+        ...line,
+        points: line.points.map(([x, y]) => [x * scaleX, y * scaleY]), // Scale points
     }));
-  
+
     // Update `lines` with resized data
     setLines(resizedLines);
-  
+
     // Recalculate the positions of sonification dots
     intersectedDots.current = alignDotsToGrid(scaleX, scaleY);
-  
+
     // Update the original size
     originalSvgSize.current = { width: newWidth, height: newHeight };
-  };
+};
+
+useEffect(() => {
+    const resizeListener = () => handleResize();
+    window.addEventListener('resize', resizeListener);
+
+    return () => window.removeEventListener('resize', resizeListener);
+}, [lines, intersectedDots]);
 
   useEffect(() => {
     const resizeListener = () => handleResize();
@@ -549,18 +674,26 @@ const TlDrawCanvasComponent = () => {
     const playbackSpeedValue = 50 + value; // Adjusting the base to 200 ms
     setPlaybackSpeed(playbackSpeedValue); // Ensure playbackSpeed is updated correctly
 
-    console.log("Current playback speed:", playbackSpeedValue);
+    // console.log("Current playback speed:", playbackSpeedValue);
   };
 
   // Called when user starts drawing (pointer down)
   const handlePointerDown = (e) => {
     e.target.setPointerCapture(e.pointerId);
-    const clickPoint = [e.pageX, e.pageY];
+    // const clickPoint = [e.pageX, e.pageY];
+    // const canvasRect = svgRef.current.getBoundingClientRect();
+    // const clickPoint = [e.clientX - canvasRect.left, e.clientY - canvasRect.top];
+    // const clickPoint = [e.pageX, e.pageY];
+
+    const container = document.querySelector('.canvas-container');
+    const containerRect = container.getBoundingClientRect();
+    const clickPoint = [e.clientX - containerRect.left, e.clientY - containerRect.top];
+
 
     if (isTrash) {
       setIsPointerDown(true);
       const { clientX, clientY } = e;
-      const canvasRect = svgRef.current.getBoundingClientRect();
+      // const canvasRect = svgRef.current.getBoundingClientRect();
       const x = clientX - canvasRect.left;
       const y = clientY - canvasRect.top;
       setTrashLinePoints([[x, y]]);
@@ -613,71 +746,16 @@ const TlDrawCanvasComponent = () => {
     }
   };
 
-
-  // const handlePointerMove = (e) => {
-  //   if (e.buttons !== 1) return; // Only draw when mouse button is held down
-  //   const newPoint = [e.pageX, e.pageY, e.pressure];
-  
-  //   // if (isTrash) {
-  //   if (isTrash && isPointerDown) {
-  //     const { clientX, clientY } = e;
-  //     const canvasRect = svgRef.current.getBoundingClientRect();
-  //     const x = clientX - canvasRect.left;
-  //     const y = clientY - canvasRect.top;
-  //     setTrashLinePoints((prevPoints) => [...prevPoints, [x, y]]);
-    
-  //     // Check for intersections with lines
-  //     const newLines = lines.filter(line => {
-  //       return !line.points.some(([px, py]) => {
-  //         return trashLinePoints.some(([tx, ty]) => {
-  //           const distance = Math.sqrt((px - tx) ** 2 + (py - ty) ** 2);
-  //           return distance < 10; // Adjust the threshold as needed
-  //         });
-  //       });
-  //     });
-    
-  //     setLines(newLines);
-  //     // Eraser mode: remove sonification points that intersect with the eraser path
-  //     setLines((prevLines) =>
-  //       prevLines.map((line) => {
-  //         const updatedSonificationPoints = line.sonificationPoints.filter((point) => {
-  //           // Check if the current eraser point overlaps with this sonification point
-  //           return !isPointNearDot(newPoint[0], newPoint[1], point[0], point[1], currentSize, line.size);
-  //         });
-  
-  //         return {
-  //           ...line,
-  //           sonificationPoints: updatedSonificationPoints,
-  //         };
-  //       })
-  //     );
-  
-  //     // Update the sonification points state for real-time feedback
-  //     setSonificationPoints((prevPoints) =>
-  //       prevPoints.filter((point) => {
-  //         return !isPointNearDot(newPoint[0], newPoint[1], point[0], point[1], currentSize, currentSize);
-  //       })
-  //     );
-  
-  //     // Visually erase by drawing with the background color
-  //     setCurrentLine((prevLine) => [...prevLine, newPoint]);
-  //   } else {
-  //     // Regular drawing mode
-  //     setCurrentLine((prevLine) => [...prevLine, newPoint]);
-  //     setSonificationPoints((prevPoints) => {
-  //       // Interpolate points for smoother sonification
-  //       const lastPoint = prevPoints.length > 0 ? prevPoints[prevPoints.length - 1] : newPoint;
-  //       const distance = Math.hypot(newPoint[0] - lastPoint[0], newPoint[1] - lastPoint[1]);
-  //       const numInterpolatedPoints = Math.floor(distance / 5); // Adjust this value for more/less interpolation
-  //       const interpolatedPoints = interpolatePoints(lastPoint, newPoint, numInterpolatedPoints);
-  //       return [...prevPoints, ...interpolatedPoints, newPoint];
-  //     });
-  //   }
-  // };
-
   const handlePointerMove = (e) => {
     if (e.buttons !== 1) return; // Only draw when mouse button is held down
-    const newPoint = [e.pageX, e.pageY, e.pressure];
+    // const canvasRect = svgRef.current.getBoundingClientRect();
+    // const newPoint = [e.clientX - canvasRect.left, e.clientY - canvasRect.top, e.pressure];
+    // const newPoint = [e.pageX, e.pageY, e.pressure];
+
+    const container = document.querySelector('.canvas-container');
+    const containerRect = container.getBoundingClientRect();
+    const newPoint = [e.clientX - containerRect.left, e.clientY - containerRect.top, e.pressure];
+
   
     if (isTrash && isPointerDown) {
       const { clientX, clientY } = e;
@@ -824,12 +902,17 @@ const TlDrawCanvasComponent = () => {
   
       // Add intersections to both intersectedDots and newLine.intersections
       sonificationPoints.forEach((point) => {
+      // sonificationPoints.forEach((point, pointIndex) => {
         for (let i = 0; i < numDotsX; i++) {
           for (let j = 0; j < numDotsY; j++) {
-            const dotX = (window.innerWidth / numDotsX) * i + window.innerWidth / numDotsX / 2;
-            const dotY = (window.innerHeight / numDotsY) * j + window.innerHeight / numDotsY / 2;
+            // const dotX = (window.innerWidth / numDotsX) * i + window.innerWidth / numDotsX / 2;
+            // const dotY = (window.innerHeight / numDotsY) * j + window.innerHeight / numDotsY / 2;
+
+            const dotX = (canvasDimensions.width / numDotsX) * i + canvasDimensions.width / numDotsX / 2;
+            const dotY = (canvasDimensions.height / numDotsY) * j + canvasDimensions.height / numDotsY / 2;
   
             if (isPointNearDot(point[0], point[1], dotX, dotY, dotRadius, currentSize)) {
+              // if (isPointNearDot(point[0], point[1], dotX, dotY, dotRadius, currentLine, options, pointIndex)) {
               if (!intersectedDots.current[i]) intersectedDots.current[i] = {};
               if (!newLine.intersections[i]) newLine.intersections[i] = {};
   
@@ -848,6 +931,9 @@ const TlDrawCanvasComponent = () => {
       setSonificationPoints([]);
     }
   };
+
+  
+
 
 const handlePlay = async () => {
   if (isPlaying) return;
@@ -901,6 +987,60 @@ const handlePlay = async () => {
   setScannedColumn(-1);
   setIsPlaying(false);
 };
+
+// const handlePlay = async () => {
+//   if (isPlaying) return;
+
+//   setIsPlaying(true);
+//   playbackStopped.current = false;
+
+//   do {
+//     for (let column = firstColumn; column < numDotsX; column++) {
+//       if (playbackStopped.current) break;
+
+//       setCurrentColumn(column); // Update the scanned column
+//       setScannedColumn(column);
+
+//       // Debugging log
+//       console.log(`Scanning column: ${column}`);
+
+//       // Determine if the current column is a multiple of 4 relative to `firstColumn`
+//       const isAccentColumn = (column - firstColumn) % 4 === 0;
+
+//       // Check the latest colorInstrumentMap and play sounds accordingly
+//       if (intersectedDots.current[column]) {
+//         const playPromises = [];
+//         for (const row in intersectedDots.current[column]) {
+//           const { color } = intersectedDots.current[column][row];
+//           const mapRowToNote = getMapRowToNote();
+//           const note = mapRowToNote[row];
+
+//           playPromises.push(
+//             playSound(
+//               color,
+//               note,
+//               1,
+//               playbackSpeedRef.current, // Use the updated playbackSpeedRef
+//               intersectedDots.current[column][row].lineId,
+//               colorInstrumentMapRef.current,
+//               isAccentColumn
+//             )
+//           );
+//         }
+//         await Promise.all(playPromises);
+//       }
+
+//       // Dynamically adjust tempo using `playbackSpeedRef.current`
+//       await new Promise(resolve =>
+//         setTimeout(resolve, playbackSpeedRef.current)
+//       );
+//     }
+//   } while (loopRef.current && !playbackStopped.current); // Check `loopRef.current` at the end of each pass
+
+//   setCurrentColumn(-1);
+//   setScannedColumn(-1);
+//   setIsPlaying(false);
+// };
 
   // // Undo and redo logic for managing drawing history
   const handleUndo = () => {
@@ -965,6 +1105,67 @@ const handlePlay = async () => {
     }
   };
 
+  const ClearScreenPopup = ({ onConfirm, onCancel }) => (
+    <div className="popup-overlay">
+      <div className="popup-content" ref={clearScreenPopupRef}>
+        <h2>Warning</h2>
+        <p>Are you sure you want to clean the screen? The drawing cannot be recovered.</p>
+        <div className="popup-buttons">
+          <button onClick={onConfirm}>Yes</button>
+          <button onClick={onCancel}>No</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const SavePopup = ({ onSave, onCancel }) => {
+    const [saveJson, setSaveJson] = useState(true);
+    const [saveImage, setSaveImage] = useState(true);
+    const [saveAudio, setSaveAudio] = useState(true);
+  
+    const handleSave = () => {
+      onSave({ saveJson, saveImage, saveAudio });
+    };
+  
+    return (
+      <div className="popup-overlay">
+        <div className="popup-content" ref={savePopupRef}>
+          <h2>Save Drawing</h2>
+          <p>Select the formats you want to save:</p>
+          <div className="popup-checkboxes">
+            <label>
+              <input
+                type="checkbox"
+                checked={saveJson}
+                onChange={(e) => setSaveJson(e.target.checked)}
+              />
+              Save as JSON
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={saveImage}
+                onChange={(e) => setSaveImage(e.target.checked)}
+              />
+              Save as Image
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={saveAudio}
+                onChange={(e) => setSaveAudio(e.target.checked)}
+              />
+              Save as Audio
+            </label>
+          </div>
+          <div className="popup-buttons">
+            <button onClick={handleSave}>Download</button>
+            <button onClick={onCancel}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const allStrokes = lines.map((line, index) => {
     const strokeOptions = { ...options, size: line.size };
@@ -982,7 +1183,7 @@ const handlePlay = async () => {
 
 return (
   <div className="main-container">
-    <div  className="controls">
+    <div  className="controls-container">
   
       <div className="play-group">
         <button
@@ -1129,6 +1330,22 @@ return (
         </button>
       </div>
 
+      {/* Toggle Grid Visibility Button */}
+      <div className="grid-group">
+        <button className="grid-button" onClick={toggleGrid}>
+          <img src={GridIcon} alt="Grid Icon" className="iconGrid" />
+        </button>
+        {/* Dummy button */}
+        <button className="clean-button" onClick={handleClearScreen}>
+          <img src={CleanIcon} alt="Clean Icon" className="iconClean" />
+        </button>
+      </div>
+
+      {/* Pop-up for clearing the screen */}
+      {isClearScreenPopupVisible && (
+        <ClearScreenPopup onConfirm={confirmClearScreen} onCancel={cancelClearScreen} />
+      )}
+
       {/* Undo and Redo Buttons */}
       <div className="steps-group">
         <button className="undo" onClick={handleUndo}>
@@ -1152,17 +1369,6 @@ return (
         </button>
       </div>
 
-      {/* Toggle Grid Visibility Button */}
-      <div className="grid-group">
-        <button className="grid-button" onClick={toggleGrid}>
-          <img src={GridIcon} alt="Grid Icon" className="iconGrid" />
-        </button>
-        {/* Dummy button */}
-        <button className="dummy-button" onClick={handleClearScreen}>
-          <img src={GridIcon} alt="Dummy Icon" className="iconGrid" />
-        </button>
-      </div>
-
       {/* Hidden file input for loading */}
       <input
         type="file"
@@ -1172,13 +1378,18 @@ return (
         ref={(input) => (loadInputRef = input)} // Assign the input to the ref
       />
 
+      {/* Save Pop-up */}
+      {isSavePopupVisible && (
+        <SavePopup onSave={handleSave} onCancel={cancelSaveDrawing} />
+      )}
+
       {/* Your other UI elements */}
       <svg ref={svgRef} /* other attributes */>
         {/* SVG content */}
       </svg>
     </div>
 
-    <div className="tldraw-container">
+    <div className="canvas-container">
       {/* Grid Canvas Component */}
       <GridCanvas showGrid={showGrid} scannedColumn={scannedColumn} intersectedDots={intersectedDots.current} />
 
@@ -1191,7 +1402,6 @@ return (
         style={{ touchAction: 'none', width: '100%', height: '100%' }}
       >
 
-        {/* TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING */}
         {isTrash && trashLinePoints.length > 0 && (
           <path
             d={getSvgPathFromStroke(trashLinePoints)}
@@ -1200,7 +1410,6 @@ return (
             fill="none"
           />
         )}
-        {/* TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING TEMPORARYTESTING */}
 
         {allStrokes}
         {currentLine.length > 0 && <path d={currentStroke} fill={currentColor} />}
@@ -1273,8 +1482,28 @@ return (
         </div>
       </div>
     )}
+
+    {isDownloading && (
+      <div className="loading-overlay">
+        <div className="loading-content">
+          <p>Downloading...</p>
+          <div className="loading-spinner"></div>
+        </div>
+      </div>
+    )}
+
+    {/* Clear Screen Pop-up */}
+    {isClearScreenPopupVisible && (
+        <ClearScreenPopup onConfirm={confirmClearScreen} onCancel={cancelClearScreen} />
+      )}
+
+      {/* Save Pop-up */}
+      {isSavePopupVisible && (
+        <SavePopup onSave={handleSave} onCancel={cancelSaveDrawing} />
+    )}
+    
   </div>
 );
 }
 
-export default TlDrawCanvasComponent;
+export default CanvasComponent;
