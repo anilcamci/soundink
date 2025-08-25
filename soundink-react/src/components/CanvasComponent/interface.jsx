@@ -108,36 +108,36 @@ const CanvasComponent = () => {
   // const instrumentOptions = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'floom', 'strings', 'synthflute', 'mute'];
   const instrumentOptions = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'synthflute', 'mute'];
 
-  // // List all instruments you want to preload
-  // const instruments = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'synthflute'];
+  // List all instruments you want to preload
+  const instruments = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'synthflute'];
 
-  // // List all notes you want to preload (from your sample mapping)
-  // const allNotes = Object.keys(mapNoteToSampleNumber);
+  // List all notes you want to preload (from your sample mapping)
+  const allNotes = Object.keys(mapNoteToSampleNumber);
 
-  // const dummyColor = '#a9103a'; // Use any color you like
+  const dummyColor = '#a9103a'; // Use any color you like
 
-  // const preloadAllSounds = async () => {
-  //   for (const instrument of instruments) {
-  //     const colorInstrumentMap = { [dummyColor]: instrument };
-  //     for (const note of allNotes) {
-  //       await playSound(
-  //         dummyColor,
-  //         note,
-  //         1,
-  //         120,
-  //         null,
-  //         colorInstrumentMap,
-  //         false,
-  //         undefined,
-  //         new GainNode(new (window.AudioContext || window.webkitAudioContext)(), { gain: 0 })
-  //       );
-  //     }
-  //   }
-  // };
+  const preloadAllSounds = async () => {
+    for (const instrument of instruments) {
+      const colorInstrumentMap = { [dummyColor]: instrument };
+      for (const note of allNotes) {
+        await playSound(
+          dummyColor,
+          note,
+          1,
+          120,
+          null,
+          colorInstrumentMap,
+          false,
+          undefined,
+          new GainNode(new (window.AudioContext || window.webkitAudioContext)(), { gain: 0 })
+        );
+      }
+    }
+  };
 
-  // useEffect(() => {
-  //   preloadAllSounds();
-  // }, []);
+  useEffect(() => {
+    preloadAllSounds();
+  }, []);
 
   // Inside your component
   const colorInstrumentMapRef = useRef(colorInstrumentMap); // Create a ref for instrument mappings
@@ -584,12 +584,20 @@ const CanvasComponent = () => {
     setIsClearScreenPopupVisible(false); // Hide the pop-up
   };
 
+  // useEffect(() => {
+  //   const loadSounds = async () => {
+  //     await preloadSounds(); // Preload sounds
+  //     setIsLoading(false);   // Hide pop-up after loading
+  //   };
+  //   loadSounds();
+  // }, []);
+
   useEffect(() => {
-    const loadSounds = async () => {
-      await preloadSounds(); // Preload sounds
-      setIsLoading(false);   // Hide pop-up after loading
+    const loadEverything = async () => {
+      await preloadAllSounds(); // Preload all instrument samples
+      setIsLoading(false);      // Hide the loading screen after preloading
     };
-    loadSounds();
+    loadEverything();
   }, []);
 
   useEffect(() => {
