@@ -103,6 +103,8 @@ export const handlePointerDown = (e, {
 
 export const handlePointerMove = (e, {
   isTrash,
+  activePointerId,
+  setActivePointerId,
   isPointerDown,
   setTrashLinePoints,
   lines,
@@ -121,6 +123,10 @@ export const handlePointerMove = (e, {
   currentLine,
   svgRef
 }) => {
+  if (activePointerId !== null && e.pointerId !== activePointerId) {
+    return;
+  };
+
   if (e.buttons !== 1) return; // Only draw when mouse button is held down
   const newPoint = [e.pageX, e.pageY, e.pressure];
 
@@ -238,9 +244,13 @@ export const handlePointerUp = ({
   setCurrentLine,
   setSonificationPoints
 }) => {
+  if (activePointerId !== null && e.pointerId !== activePointerId) {
+    return;
+  }
+
   setIsPointerDown(false);
   setActivePointerId(null);
-  
+
   if (isTrash) {
     setIsPointerDown(false);
     setTrashLinePoints([]); // Clear the trash line points

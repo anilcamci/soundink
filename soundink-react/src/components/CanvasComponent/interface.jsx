@@ -775,7 +775,7 @@ const CanvasComponent = () => {
 
   // Interpolates points between start and end to generate smooth lines
   const interpolatePoints = (start, end, numPoints) => {
-    console.time('Interpolation');
+    // console.time('Interpolation');
     const points = [];
     for (let i = 1; i <= numPoints; i++) {
       const t = i / (numPoints + 1);
@@ -785,7 +785,7 @@ const CanvasComponent = () => {
       // points.push([x, y, pressure]);
       points.push([x, y]);
     }
-    console.timeEnd('Interpolation');
+    // console.timeEnd('Interpolation');
     return points;
   };
 
@@ -1286,7 +1286,7 @@ const CanvasComponent = () => {
   };
 
   const handlePlay = async () => {
-    console.time('Sonification');
+    // console.time('Sonification');
     if (isPlaying) return;
 
     setIsPlaying(true);
@@ -1348,7 +1348,7 @@ const CanvasComponent = () => {
     setCurrentColumn(-1);
     setScannedColumn(-1);
     setIsPlaying(false);
-    console.timeEnd('Sonification');
+    // console.timeEnd('Sonification');
   };
 
   const updateLineColor = (line, newColor) => {
