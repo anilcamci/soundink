@@ -1,3 +1,31 @@
+/* :root {
+  --canvasColor: #eae6e1;
+  --sideBarColor: #2E2E2E;
+  --buttonColor: #a36a59;
+  --buttonHoverColor: #667d4d;
+  --shadowBorder: #96B378;
+  --sliderColor: #96b37885;
+  --shadowColor: #96B378;
+  --menuButtonColor: #a36a59;
+  --menuColor: #96B378;
+  --menuTextColor: #2E2E2E;
+} */
+
+:root {
+  --canvasColor: #eae6e1;
+  --editmodeColor: #b7aea2;
+  --sideBarColor: #4d9cae; 
+  --buttonColor: #b64545;
+  --buttonHoverColor: #bf5050;
+  --shadowBorder: #ffefd8;
+  --sliderColor: #b1e21185;
+  --shadowColor: #c8b66d;
+  --menuButtonColor: #4d9cae;
+  --menuColor: #96B378;
+  --menuTextColor: #2E2E2E;
+  --settingButtonColor: #1f57b8;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -27,9 +55,9 @@ html, body {
   margin-top: 0px;
   margin-left: 0px;
   height: 100%;
-  max-width: 100px;
+  max-width: 110px;
   padding: 20px 20px;
-  background: linear-gradient(90deg, #4e76bb 0%, #4e76bb 100%);
+  background: linear-gradient(90deg, var(--sideBarColor) 0%, var(--sideBarColor) 100%);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
   /* box-sizing: border-box; */
   display: flex;
@@ -37,7 +65,7 @@ html, body {
   align-items: center;
   gap: 20px;
   /* overflow-y: auto; */
-  border: 3px solid #4e76bb;
+  border: 3px solid var(--sideBarColor);
   z-index: 1;
 }
 
@@ -54,16 +82,25 @@ html, body {
 
 /* Main container style */
 .canvas-container {
-  display: flex;
+  display: flex;  
   flex-direction: column;
   position: relative;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
   box-sizing: border-box;
-  background-color: #eae6e1;
+  background-color: var(--canvasColor);
   z-index: 1;
 }
+
+/* interface.css */
+.canvas-container {
+  transition: background-color 0.3s ease; /* Smooth transition */
+}
+
+/* .canvas-container.edit-mode-active {
+  background-color: #ff0000;
+} */
 
 /* SVG Drawing Area */
 .canvas-container svg {
@@ -74,14 +111,16 @@ html, body {
 
 /* Color button grid styling */
 .color-group {
-  /* display: flex; */
-  display: grid;
-  grid-template-columns: repeat(1, 2fr);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* display: grid; */
+  grid-template-columns: repeat(1, 3fr);
   gap: 1vh;
   width: 100%;
   justify-content: center;
   /* Center align the buttons */
-  margin-bottom: 0px;
+  margin-bottom: 0vh;
   /* overflow: hidden; */
 }
 
@@ -104,41 +143,49 @@ button {
 }
 
 .color-button {
-  width: 100% !important;
-  height: 100% !important;
+  /* width: 100% !important;
+  height: 100% !important; */
+  background-color: var(--menuTextColor);
+  width: 75px !important;
+  height: 75px !important;
   aspect-ratio: 1 / 1;
-  /* border: 2px solid #333 !important; */
   border-radius: 30% !important;
+  /* border: 2px solid var(--buttonColor); */
+  /* border: 7px solid !important; */
   border-style: solid;
-  /* Change to dashed, dotted, etc., if needed */
   cursor: pointer;
-  transition: transform 0.2s;
+  /* transition: transform 0.2s; */
+  transition: transform 0.2s, border-color 0.2s !important;
   transform: scale(1);
+  align-items: center;
+  justify-content: center;
+  display: flex;
 }
 
 .color-button:hover {
   transform: scale(1.05);
 }
 
-
 .color-button.active {
-  /* border: 4px solid #ffffff;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7); */
-  /* border: 1px solid #ffe2d6; */
   box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffc400;
+    0 0 7px var(--shadowBorder),
+    0 0 7px var(--shadowColor),
+    0 0 9px var(--shadowColor),
+    0 0 13px var(--shadowColor);
 }
 
-
 .instrument-select-button {
-  width: 100% !important;
-  height: 100% !important;
-  background-color: #704f4a;
+  /* width: 50% !important;
+  height: 50% !important; */
+  width: 30px !important;
+  height: 30px !important;
+  background-color: var(--settingButtonColor) !important;
+  border-color: var(--menuColor) !important;
   transition: transform 0.2s;
   transform: scale(1);
+  position: absolute;
+  top: -10%;
+  left: 70%;
 }
 
 .instrument-select-button:hover {
@@ -148,12 +195,13 @@ button {
 /* Container for each color-instrument pair */
 .color-instrument-pair {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  position: relative;
   /* gap: 10px; */
   gap: 0.5vw;
   width: 100%;
-  justify-content: center;
 }
 
 
@@ -171,6 +219,8 @@ button {
 .grid-group,
 .save-load-buttons,
 .play-group,
+.edit-container,
+.load-save-group,
 .scale-container {
   display: flex;
   /* Arrange buttons horizontally */
@@ -183,9 +233,14 @@ button {
   justify-content: center;
   /* Center align the buttons */
   align-items: center;
-  /* margin-bottom: 10px; */
-  margin-top: 10px;
+  margin-bottom: 1vh;
+  margin-top: 0vh;
   /* Adjust spacing above the group */
+}
+
+.edit-container {
+  margin-top: 0vh;
+  margin-bottom: 10px !important;
 }
 
 @media (max-height: 800px) {
@@ -198,24 +253,25 @@ button {
 } */
 
 .play-group {
-  margin-top: 40px;
-  margin-bottom: 40px;
+  margin-top: 10px;
+  margin-bottom: 10px;
 }
 
 .loop-scale-group {
   margin-top: 0px;
-  margin-bottom: 10px;
+  margin-bottom: 10px !important;
 }
 
-.color-button,
+/* .color-button, */
 .instrument-select-button,
 .eraser-button,
 .trash-button,
 .undo,
 .redo,
-.play-stop-button,
 .grid-button,
 .clean-button,
+.settings-button,
+.edit-button,
 .loop-button,
 .save-button,
 .load-button,
@@ -224,14 +280,14 @@ button {
   /* height: 0%; */
   padding: 0px;
   margin: 0 auto;
-  border: 2px solid #33368f;
+  border: 2px solid var(--buttonColor);
   /* border: None; */
   border-radius: 30%;
   font-size: 1.8em;
   cursor: pointer;
   /* box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); */
   transition: transform 0.2s, background-color 0.2s;
-  background-color: #33368f;
+  background-color: var(--buttonColor);
   text-align: center;
   box-shadow: none;
   /* transition: border-color 0.5s ease-out, box-shadow 0.5s ease-out; */
@@ -240,6 +296,13 @@ button {
     border-color 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), /* Quick ease-in */
     box-shadow 0.6s cubic-bezier(0.42, 0, 0.58, 1); /* Smooth ease-out for shadow */
 }
+
+/* .edit-button {
+  margin-top: 10px;
+  width: 55px;
+  height: 55px;
+  border-radius: 30%;
+} */
 
 /* 33368f blue-ish */
 /* 9e273e red */
@@ -258,14 +321,18 @@ button {
 } */
 
 
-.eraser-button.active, .trash-button.active
+.eraser-button.active, .trash-button.active, .edit-button.active
  {
-  /* border: 1px solid #ffe2d6; */
   box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffc400;
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowColor);
+}
+
+.edit-button.active {
+  background-color: var(--buttonHoverColor);
+  border-color: var(--shadowBorder);
 }
 
 .eraser-button:hover,
@@ -275,51 +342,53 @@ button {
 .loop-button:hover,
 .grid-button:hover,
 .clean-button:hover,
+.settings-button:hover,
+.edit-button:hover,
 .stop-mode:hover,
-.save-button:hover,
-.load-button:hover,
 .scale-button:hover {
   transform: scale(1.05);
-  background-color: #1e2168;
+  background-color: var(--buttonHoverColor);
 }
 /* 9e273e */
 .stop-mode {
   /* background-color: #b72929; */
-  border: 1px solid #ffe2d6;
+  border: 1px solid var(--shadowBorder);
   box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffc400;
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowColor);
 }
 
 
 .grid-button:active,
 .clean-button:active,
+.settings-button:active,
+.edit-button:active,
 .scale-button:active,
 .loop-button:active,
 .play-stop-button:active,
 .undo:active,
 .redo:active,
-.save-button:active,
-.load-button:active,
 .eraser-button:active,
 .trash-button:active {
-  border: 1px solid #ffe2d6;
+  border: 1px solid var(--shadowBorder);
   box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffc400;
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowColor);
 }
 
 @media (max-height: 800px) {
   .eraser-container,
   .steps-group,
+  .edit-container,
   .loop-scale-group,
   .grid-group,
   .save-load-buttons,
   .play-group,
+  .load-save-group,
   .scale-container {
     display: flex;
     /* Arrange buttons horizontally */
@@ -341,19 +410,39 @@ button {
     margin-top: 15px;
     margin-bottom: 20px;
   }
-
-  .play-stop-button {
-    width: 4vw;
   }
-
-  .loop-scale-group {
-    margin-top: 0px;
-    margin-bottom: 0px;
-  }
-}
 
 .play-stop-button {
-  background-color: #12890e;
+  margin-top: 0px;
+  width: 75px;
+  /* height: 0%; */
+  padding: 0px;
+  margin: 0 auto;
+  border: 2px solid var(--buttonColor);
+  /* border: None; */
+  border-radius: 30%;
+  font-size: 1.8em;
+  cursor: pointer;
+  /* box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); */
+  transition: transform 0.2s, background-color 0.2s;
+  background-color: var(--buttonColor);
+  text-align: center;
+  box-shadow: none;
+  /* transition: border-color 0.5s ease-out, box-shadow 0.5s ease-out; */
+  transition: 
+    transform 0.3s cubic-bezier(0.42, 0, 0.58, 1), /* Smooth scale transition */
+    border-color 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), /* Quick ease-in */
+    box-shadow 0.6s cubic-bezier(0.42, 0, 0.58, 1); /* Smooth ease-out for shadow */
+}
+
+.loop-scale-group {
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+
+.play-stop-button {
+  background-color: var(--buttonColor);
 }
 
 .stop-mode {
@@ -361,7 +450,7 @@ button {
 }
 
 .play-stop-button:hover {
-  background-color: #056601;
+  background-color: var(--buttonColor);
 }
 
 /* ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
@@ -372,7 +461,7 @@ button {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #33368f;
+  background-color: var(--menuColor);
   /* border: 2px solid #333; */
   padding: 20px;
   border-radius: 25px;
@@ -407,8 +496,8 @@ button {
   /* Adjust button size */
   height: 80px;
   /* Adjust button size */
-  background-color: #901e29;
-  border: 2px solid #901e29;
+  background-color: var(--menuButtonColor);
+  border: 2px solid var(--menuButtonColor);
   border-radius: 30%;
   /* border-radius: 20%; */
   cursor: pointer;
@@ -425,12 +514,12 @@ button {
 .instrument-option-button:hover {
   background-color: #9c1825;
   transform: scale(1.05);
-  border: 1px solid #ffe2d6;
+  border: 1px solid var(--shadowBorder);
   box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffc400;
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowColor);
 }
 
 .close-modal-button {
@@ -449,13 +538,24 @@ button {
 .close-modal-button:hover {
   background-color: #c32b2b;
 }
+/* 
+.instrument-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  justify-content: center;
+  align-items: center; 
+} */
 
 .instrument-options-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* Two columns */
-  gap: 20px; /* Space between rows and columns */
-  justify-content: center; /* Center align the grid */
-  align-items: center; /* Align items vertically */
+  grid-template-columns: repeat(3, 1fr); /* 3 columns */
+  grid-template-rows: auto auto; /* 2 rows */
+  gap: 20px; /* Space between items */
+  justify-items: center; /* Center items horizontally */
+  align-items: center; /* Center items vertically */
+  width: 100%;
+  margin-top: 20px; /* Adjust spacing above the grid */
 }
 
 .instrument-option-cell {
@@ -467,7 +567,7 @@ button {
 
 .instrument-label {
   font-size: 0.9em;
-  color: #ffd500; /* Match the theme color */
+  color: var(--menuTextColor); /* Match the theme color */
   text-align: center;
   /* font-weight: bold; */
 }
@@ -480,6 +580,7 @@ button {
 .iconLoop,
 .noLoop,
 .iconGrid,
+.iconGear,
 .iconClean,
 .iconTempo,
 .iconEraser,
@@ -489,6 +590,7 @@ button {
 .iconDown,
 .iconUp,
 .iconQuit,
+.iconEdit,
 .scale-icon{
   width: auto;
   /* Allow the SVG to scale */
@@ -503,11 +605,14 @@ button {
   margin: center;
   /* Center the SVG within the button */
   transform: scale(0.7);
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  /* filter: drop-shadow(0 0 2px #ffc800); */
-  filter: drop-shadow(0 0 1px #ffc800) drop-shadow(0 0 2px #ffc800);
+  filter: drop-shadow(0 0 0px var(--shadowColor)) drop-shadow(0 0 1px var(--shadowColor));
   animation: inner-glow 2s infinite alternate;
+}
+
+.iconEdit {
+  transform: scale(0.5);
 }
 
 .iconGrid {
@@ -519,7 +624,8 @@ button {
 }
 
 .iconQuit {
-  transform: scale(1.8);
+  transform: scale(10);
+  filter: None;
 }
 
 .iconDo {
@@ -541,6 +647,7 @@ button {
 button:hover .iconStop, button.active .iconStop, .iconStop,
 button:hover .iconDo,
 button:hover .iconGrid,
+button:hover .iconGear,
 button:hover .iconClean,
 button:hover .iconQuit,
 button:hover .iconEraser, button.active .iconEraser,
@@ -548,15 +655,15 @@ button:hover .iconTrash, button.active .iconTrash,
 button:hover .iconLoop, 
 button:hover .noLoop, button.active .noLoop,
 button:hover .scale-icon, button:hover .scale-option-icon {
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  filter: drop-shadow(0 0 1px #ffc800) drop-shadow(0 0 3px #ffc800) drop-shadow(0 0 5px #ffc800);
+  filter: drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 2px var(--shadowColor));
 }
 
 button.active .iconPlay, button:hover .iconPlay {
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  filter: drop-shadow(0 0 3px #ffc800) drop-shadow(0 0 5px #ffc800) drop-shadow(0 0 5px #ffc800);
+  filter: drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 2px var(--shadowColor));
 }
 
 .instrument-icon {
@@ -573,15 +680,15 @@ button.active .iconPlay, button:hover .iconPlay {
   margin: center;
   /* Center the SVG within the button */
   /* transform: scale(0.8); */
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  filter: drop-shadow(0 0 1px #ffc800) drop-shadow(0 0 2px #ffc800);
+  filter: drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 2px var(--shadowColor));
 }
 
 button:hover .instrument-icon {
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  filter: drop-shadow(0 0 1px #ffc800) drop-shadow(0 0 3px #ffc800) drop-shadow(0 0 5px #ffc800);
+  filter: drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 3px var(--shadowColor)) drop-shadow(0 0 5px var(--shadowColor));
 }
 
 .instrument-sidebar-icon {
@@ -598,18 +705,56 @@ button:hover .instrument-icon {
   margin: center;
   /* Center the SVG within the button */
   transform: scale(0.65);
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  filter: drop-shadow(0 0 1px #ffc800) drop-shadow(0 0 2px #ffc800);
+  filter: drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 2px var(--shadowColor));
 }
 
 button:hover .instrument-sidebar-icon {
-  stroke: #ffd500;
+  stroke: var(--shadowColor);
   stroke-width: 2px;
-  filter: drop-shadow(0 0 1px #ffc800) drop-shadow(0 0 3px #ffc800) drop-shadow(0 0 5px #ffc800);
+  filter: drop-shadow(0 0 1px var(--shadowColor)) drop-shadow(0 0 3px var(--shadowColor)) drop-shadow(0 0 5px var(--shadowColor));
+}
+
+.color-button-instrument-icon {
+  width: auto;
+  /* Allow the SVG to scale */
+  height: auto;
+  /* Allow the SVG to scale */
+  max-width: 100%;
+  /* Adjust as needed to control size within the button */
+  max-height: 100%;
+  /* Adjust as needed to control size within the button */
+  display: block;
+  /* Ensure the SVG is centered */
+  margin: center;
+  /* Center the SVG within the button */
+  transform: scale(0.65);
+  stroke: var(--shadowColor);
+  stroke-width: 2px;
+  /* filter: drop-shadow(0 0 1px var(--menuTextColor)) drop-shadow(0 0 1px var(--menuTextColor)); */
+  filter: drop-shadow(0 0 1px var(--shadowColor));
 }
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
+
+.vertical-sliders-1 {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  width: 50%;
+  margin-bottom: 0vh;
+  margin-top: 3.5vh;
+}
+
+.vertical-sliders-2 {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  width: 50%;
+  margin-bottom: 2vh;
+  margin-top: 6vh;
+}
 
 /* Brush size and Playback Speed slider styling with Icon labels */
 
@@ -620,8 +765,8 @@ button:hover .instrument-sidebar-icon {
   gap: 0px;
   width: 100%;
   max-height: 50%;
-  margin-top: 5vh;
-  margin-bottom: 5vh;
+  margin-top: 0vh;
+  margin-bottom: 0vh;
   justify-content: center;
 }
 
@@ -635,8 +780,8 @@ button:hover .instrument-sidebar-icon {
   appearance: none;
   width: 10em !important;
   height: 40px;
-  max-width: 10em;
-  background: #33368f;
+  max-width: 8em;
+  background: var(--sliderColor);
   border-radius: 11px;
   outline: none;
   cursor: pointer;
@@ -649,8 +794,8 @@ button:hover .instrument-sidebar-icon {
   appearance: none;
   width: 128px !important;
   height: 40px;
-  max-width: 10em;
-  background: #33368f;
+  max-width: 8em;
+  background: var(--sliderColor);
   border-radius: 11px;
   outline: none;
   cursor: pointer;
@@ -679,16 +824,16 @@ button:hover .instrument-sidebar-icon {
   appearance: none;
   width: 50px;
   height: 50px;
-  background-color: #ffe2d6;
-  background-image: url('./../../assets/icons/brush-svgrepo-com-3.svg');
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/brush-svgrepo-com-2.svg');
   background-size: 70%;
   background-position: center;
   background-repeat: no-repeat;
   /* border: 2px solid #310e15; */
-  border: 1px solid #ffe2d6;
-  box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor); */
   border-radius: 25%;
   cursor: pointer;
   transform: rotate(90deg);
@@ -706,16 +851,16 @@ button:hover .instrument-sidebar-icon {
   appearance: none;
   width: 50px;
   height: 50px;
-  background-color: #ffe2d6;
-  background-image: url('./../../assets/icons/metronome-tempo-beat-bpm-svgrepo-com-2.svg');
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/metronome-tempo-beat-bpm-svgrepo-com-3.svg');
   background-size: 70%;
   background-position: center;
   background-repeat: no-repeat;
   /* border: 2px solid #310e15; */
-  border: 1px solid #ffe2d6;
-  box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor); */
   border-radius: 25%;
   cursor: pointer;
   transform: rotate(90deg);
@@ -732,17 +877,17 @@ button:hover .instrument-sidebar-icon {
 .brush-size-group input[type="range"]::-moz-range-thumb {
   width: 40px;
   height: 40px;
-  background-color: #ffe2d6;
-  background-image: url('./../../assets/icons/brush-svgrepo-com-3.svg');
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/brush-svgrepo-com-2.svg');
   background-size: contain;
   background-repeat: no-repeat;
   /* border: 2px solid #310e15; */
-  border: 1px solid #ffe2d6;
-  box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffe2d6;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowBorder); */
   border-radius: 50%;
   cursor: pointer;
   transition: background-color 0.3s;
@@ -751,29 +896,180 @@ button:hover .instrument-sidebar-icon {
 .slider-group input[type="range"]::-moz-range-thumb {
   width: 40px;
   height: 40px;
-  background-color: #ffe2d6;
-  background-image: url('./../../assets/icons/metronome-tempo-beat-bpm-svgrepo-com-2.svg');
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/metronome-tempo-beat-bpm-svgrepo-com-3.svg');
   background-size: contain;
   background-repeat: no-repeat;
   /* border: 2px solid #310e15; */
-  border: 1px solid #ffe2d6;
-  box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffe2d6;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowBorder); */
   border-radius: 50%;
   cursor: pointer;
   transition: background-color 0.3s;
 }
 
-.vertical-sliders {
+/* Grid Slider Group Styling */
+.grid-slider-group {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 0px;
+  width: 100%;
+  max-height: 50%;
+  margin-top: 0vh;
+  margin-bottom: 0vh;
   justify-content: center;
-  width: 50%;
 }
 
+.grid-slider-group label {
+  font-size: 1.8em;
+  color: var(--menuTextColor); /* Match the theme color */
+}
+
+/* Grid Slider Input Styling */
+.grid-slider-group input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10em !important;
+  height: 40px;
+  max-width: 8em;
+  background: var(--sliderColor);
+  border-radius: 11px;
+  outline: none;
+  cursor: pointer;
+  transform: rotate(-90deg); /* Vertical orientation */
+}
+
+/* Grid Slider Thumb Styling */
+.grid-slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 50px;
+  height: 50px;
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/ruler-svgrepo-com.svg'); /* Replace with your grid icon */
+  background-size: 70%;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor); */
+  border-radius: 25%;
+  cursor: pointer;
+  transform: rotate(90deg); /* Rotate the thumb to match the slider */
+  transition: background-color 0.3s;
+}
+
+/* Adjust Thumb Size for Smaller Screens */
+@media (max-height: 800px) {
+  .grid-slider-group input[type="range"]::-webkit-slider-thumb {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Grid Slider Thumb Styling for Firefox */
+.grid-slider-group input[type="range"]::-moz-range-thumb {
+  width: 40px;
+  height: 40px;
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/ruler-svgrepo-com.svg'); /* Replace with your grid icon */
+  background-size: contain;
+  background-repeat: no-repeat;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowBorder); */
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+
+/* Grid Slider Group Styling */
+.volume-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  width: 100%;
+  max-height: 50%;
+  margin-top: 0vh;
+  margin-bottom: 0vh;
+  justify-content: center;
+}
+
+.volume-slider-group label {
+  font-size: 1.8em;
+  color: var(--menuTextColor); /* Match the theme color */
+}
+
+/* Grid Slider Input Styling */
+.volume-slider-group input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10em !important;
+  height: 40px;
+  max-width: 8em;
+  background: var(--sliderColor);
+  border-radius: 11px;
+  outline: none;
+  cursor: pointer;
+  transform: rotate(-90deg); /* Vertical orientation */
+}
+
+/* Grid Slider Thumb Styling */
+.volume-slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 50px;
+  height: 50px;
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/audio-music-on-song-sound-speaker-svgrepo-com-2.svg'); /* Replace with your grid icon */
+  background-size: 70%;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor); */
+  border-radius: 25%;
+  cursor: pointer;
+  transform: rotate(90deg); /* Rotate the thumb to match the slider */
+  transition: background-color 0.3s;
+}
+
+/* Adjust Thumb Size for Smaller Screens */
+@media (max-height: 800px) {
+  .volume-slider-group input[type="range"]::-webkit-slider-thumb {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Grid Slider Thumb Styling for Firefox */
+.volume-slider-group input[type="range"]::-moz-range-thumb {
+  width: 40px;
+  height: 40px;
+  background-color: var(--buttonColor);
+  background-image: url('./../../assets/icons/audio-music-on-song-sound-speaker-svgrepo-com-2.svg'); /* Replace with your grid icon */
+  background-size: contain;
+  background-repeat: no-repeat;
+  border: 1px solid var(--buttonColor);
+  /* box-shadow: 
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowBorder); */
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
 /* ///////////////////////////////////////////////////////////////////////////////////////////////////// */
@@ -787,8 +1083,8 @@ button:hover .instrument-sidebar-icon {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #33368f;
-  border: 2px solid #33368f;
+  background-color: var(--menuColor);
+  border: 2px solid var(--menuColor);
   padding: 40px;
   border-radius: 25px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -810,10 +1106,38 @@ button:hover .instrument-sidebar-icon {
   justify-content: center;
 }
 
+.scale-options-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 columns */
+  grid-template-rows: repeat(2, auto); /* 2 rows */
+  gap: 60px; /* Space between items */
+  justify-items: center; /* Center items horizontally */
+  align-items: center; /* Center items vertically */
+  width: 100%;
+  margin-top: 20px; /* Adjust spacing above the grid */
+}
+
+/* Individual Scale Option Cell */
+.scale-option-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Label Under Each Scale Option */
+.scale-label {
+  font-size: 14px;
+  /* font-weight: bold; */
+  margin-top: 8px;
+  color: var(--shadowColor);
+  text-align: center;
+}
+
 .scale-option-button {
   background: transparent;
-  background-color: #891515;
-  border: 2px solid #891515;
+  background-color: var(--menuButtonColor);
+  border: 2px solid var(--menuButtonColor);
   border-radius: 30%;
   padding: 10px;
   cursor: pointer;
@@ -850,13 +1174,14 @@ button:hover .instrument-sidebar-icon {
 }
 
 .instrument-label,
-.scale-label {
+.scale-label,
+.settings-label {
   font-size: 1em;
-  color: #ffd500; /* Adjust color to fit the theme */
+  color: var(--menuTextColor); /* Adjust color to fit the theme */
   /* font-weight: bold; */
-  text-shadow: 
-    0 0 10px #ffe2d6,
-    0 0 1px #ffc400;
+  /* text-shadow:  */
+    /* 0 0 10px var(--shadowBorder), */
+    /* 0 0 1px var(--shadowColor); */
 }
 
 /* ///////////////////////////////////////////////////////////////////////////////////////////////////// */
@@ -881,12 +1206,12 @@ button:hover .instrument-sidebar-icon {
 /* Content inside the loading pop-up */
 .loading-content {
   text-align: center;
-  background: #33368f;
+  background: var(--buttonColor);
   padding: 2rem;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   font-family: Arial, sans-serif;
-  color: #ffc400;
+  color: var(--shadowColor);
 }
 
 /* Loading spinner (simple animation) */
@@ -894,8 +1219,8 @@ button:hover .instrument-sidebar-icon {
   margin: 1rem auto;
   width: 40px;
   height: 40px;
-  border: 5px solid #ffe2d6;
-  border-top-color: #ffc400;
+  border: 5px solid var(--shadowBorder);
+  border-top-color: var(--shadowColor);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -909,15 +1234,15 @@ button:hover .instrument-sidebar-icon {
 /* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
 /* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
 
-.instrument-options-grid {
+/* .instrument-options-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* Two columns */
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
   justify-items: center;
   align-items: center;
   width: 100%;
   margin-top: 50px;
-}
+} */
 
 .instrument-option-cell {
   display: flex;
@@ -928,10 +1253,10 @@ button:hover .instrument-sidebar-icon {
 
 .close-modal-button {
   position: absolute;
-  top: -30px;
-  left: 10px;
-  width: 50px;
-  height: 50px;
+  top: -40px;
+  left: 5px;
+  width: 40px;
+  height: 40px;
   background-color: #9e2424;
   color: white;
   border-radius: 50%;
@@ -951,38 +1276,11 @@ button:hover .instrument-sidebar-icon {
   font-size: 14px;
   /* font-weight: bold; */
   margin-top: 8px;
-  color: #ffc400;
+  color: var(--menuTextColor);
   text-align: center;
 }
 
 
-/* Grid for Scale Options */
-.scale-options-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* Two columns for alignment */
-  gap: 20px;
-  justify-items: center;
-  align-items: center;
-  width: 100%;
-  margin-top: 50px;
-}
-
-/* Individual Scale Option Cell */
-.scale-option-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-/* Label Under Each Scale Option */
-.scale-label {
-  font-size: 14px;
-  /* font-weight: bold; */
-  margin-top: 8px;
-  color: #ffc400;
-  text-align: center;
-}
 
 .popup-overlay {
   position: fixed;
@@ -1109,12 +1407,12 @@ button:hover .instrument-sidebar-icon {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 /* Pop-up content styling */
 .popup-content {
-  background: #33368f;
+  background: var(--buttonColor);
   padding: 20px;
   border-radius: 15px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -1150,7 +1448,7 @@ button:hover .instrument-sidebar-icon {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #ffd500;
+  color: var(--menuTextColor);
 }
 
 .popup-buttons {
@@ -1171,10 +1469,227 @@ button:hover .instrument-sidebar-icon {
 .popup-buttons button:hover {
   background-color: #9c1825;
   transform: scale(1.05);
-  border: 1px solid #ffe2d6;
+  border: 1px solid var(--shadowBorder);
   box-shadow: 
-    0 0 5px #ffe2d6,
-    0 0 3px #ffc400,
-    0 0 5px #ffc400,
-    0 0 7px #ffc400;
+    0 0 5px var(--shadowBorder),
+    0 0 3px var(--shadowColor),
+    0 0 5px var(--shadowColor),
+    0 0 7px var(--shadowColor);
 }
+
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+
+
+.settings-selection-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--menuColor);
+  border: 2px solid var(--menuColor);
+  padding: 50px;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  height: 100px;
+  max-width: 550px; /* Adjust to fit within the screen */
+  max-height: 50%; /* Restrict the height */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; /* Add space between items */
+  overflow-y: auto; /* Ensure content does not overflow */
+  font-family: 'Roboto', sans-serif; /* Apply font */
+}
+
+.settings-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px; /* Space between button and text */
+}
+
+.settings-options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  gap: 15px;
+  justify-content: center;
+}
+
+.settings-option-button:hover {
+  background-color: var(--menuButtonColor);
+}
+
+.settings-label {
+  font-size: 14px;
+  /* font-weight: bold; */
+  margin-top: 8px;
+  color: var(--menuTextColor);
+  text-align: center;
+}
+
+
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+
+.color-palette-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--menuColor);
+  padding: 20px;
+  border: None;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  max-width: 950px;
+  display: flex;
+  /* flex-direction: column; */
+  align-items: center;
+  gap: 10px; 
+  overflow-y: auto;
+  font-family: 'Roboto', sans-serif;
+}
+
+.color-palette {
+  background-color: var(--menuColor);
+  padding: 20px;
+  border-radius: 25px;
+  /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); */
+  z-index: 1000;
+  max-width: 950px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  /* flex-direction: column; */
+  align-items: center;
+  gap: 10px; 
+  overflow-y: auto;
+  font-family: 'Roboto', sans-serif;
+}
+
+.color-option {
+  width: 50px;
+  height: 50px;
+  border: 0px solid #838383;
+  border-radius: 25%;
+  cursor: pointer;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.close-palette-button {
+  margin-top: 10px;
+  padding: 5px 10px;
+  background-color: #ccc;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+/* ////////////////////////////////////////////////////////////////////////////////////////////////////// */
+
+/* .combined-selection-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--menuColor);
+  padding: 20px;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  max-width: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  overflow-y: auto; 
+  font-family: 'Roboto', sans-serif;
+}
+
+.instrument-label {
+  text-align: center;
+  font-size: 12px;
+  margin-top: 5px;
+} */
+
+
+.combined-selection-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--menuColor);
+  padding: 50px;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  max-width: 650px; /* Adjust width as needed */
+  display: flex;
+  flex-direction: row; /* Horizontal layout */
+  align-items: flex-start; /* Align items to the top */
+  gap: 50px; /* Space between color and instrument sections */
+  overflow-y: auto;
+  font-family: 'Roboto', sans-serif;
+}
+
+.color-options {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr); /* Adjust based on the number of colors per row */
+  gap: 10px;
+  width: 600px; /* Fixed width for the color grid */
+}
+
+.instrument-options {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr); /* Adjust based on the number of instruments per row */
+  gap: 10px;
+  width: 300px; /* Fixed width for the instrument grid */
+}
+
+.color-option {
+  width: 60px;
+  height: 60px;
+  border: 0px solid #838383;
+  border-radius: 25%;
+  cursor: pointer;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.instrument-option-button {
+  width: 60px;
+  height: 60px;
+  background-color: var(--menuButtonColor);
+  border: 2px solid var(--menuButtonColor);
+  border-radius: 30%;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.instrument-option-button:hover {
+  background-color: #9c1825;
+  transform: scale(1.05);
+}
+
+.instrument-label {
+  text-align: center;
+  font-size: 12px;
+  margin-top: 1px;
+}
+

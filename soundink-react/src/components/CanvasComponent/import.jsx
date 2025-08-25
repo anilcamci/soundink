@@ -9,6 +9,7 @@ import {
     LoopIcon,
     TempoIcon,
     GridIcon,
+    GearIcon,
     TrashIcon,
     quitIcon,
     NoLoopIcon,
@@ -32,7 +33,9 @@ import {
     instrumentIcons,
     scaleIcons,
     customInstrumentNames,
-    customScaleNames
+    customScaleNames,
+    PaletteIcon,
+    EditIcon
   } from './icons';
 
 // Importing constants and helper functions from drawing
@@ -43,7 +46,9 @@ MAX_DELAY,
 ERASER_COLOR,
 options,
 isPointNearDot,
-isPointNearLineSegment
+isPointNearLineSegment,
+getStrokeWidthFromOptions,
+calculateLocalWidth
 } from './drawing';
 
 // Importing context
@@ -57,10 +62,10 @@ import { stopSoundsForLine, preloadSounds } from './soundPlayer';
 import { getSvgPathFromStroke } from './utils'; // Utility function to convert stroke to SVG path
 import { getStroke } from 'perfect-freehand'; // Used to calculate stroke paths for drawing
 import { getMapRowToNote, setScale } from './soundMappings'; // Function to map rows to musical notes
-import { playSound } from './soundPlayer'; // Function to play the sound associated with each note/color
+import { playSound, setMasterVolume } from './soundPlayer'; // Function to play the sound associated with each note/color
 import GridCanvas from '../GridComponent/grid';
 import { canvasDimensions } from '../GridComponent/grid';
-import { firstColumn, fistColumnScan, numDotsX, numDotsY, dotRadius } from '../GridComponent/gridConfig';
+import { firstColumn, fistColumnScan, numDotsX, numDotsY, dotRadius, gridConfigurations } from '../GridComponent/gridConfig';
 
 export {
     PlayIcon,
@@ -115,10 +120,17 @@ export {
     setScale,
     playSound,
     GridCanvas,
+    GearIcon,
     firstColumn,
     fistColumnScan,
     numDotsX,
     numDotsY,
     dotRadius,
-    canvasDimensions
+    canvasDimensions,
+    gridConfigurations,
+    setMasterVolume,
+    getStrokeWidthFromOptions,
+    calculateLocalWidth,
+    PaletteIcon,
+    EditIcon
 }

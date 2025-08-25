@@ -27,7 +27,7 @@ export const scales = {
 };
 
 // Export a default scale
-let selectedScale = 'major';
+let selectedScale = 'pentatonicMinor';
 export const getMapRowToNote = () => scales[selectedScale];
 
 // Function to set the current scale dynamically

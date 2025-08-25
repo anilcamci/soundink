@@ -11,7 +11,7 @@ const drawStar = (ctx, x, y, radius, color, rotationAngle = 0) => {
 
     ctx.fillStyle = color;
     ctx.beginPath();
-    const spikes = 100;
+    const spikes = 50;
     const outerRadius = radius;
     const innerRadius = radius / 2;
     let rotation = Math.PI / 2 * 3;
@@ -32,17 +32,49 @@ const drawStar = (ctx, x, y, radius, color, rotationAngle = 0) => {
     ctx.restore(); // Restore the original context state
 };
 
-const GridCanvas = ({ showGrid, scannedColumn, intersectedDots }) => {
+const DARKEN_FACTOR = 0.6; // Adjust this to control how much darker the color becomes
+const LIGHTEN_FACTOR = 3 ; // Adjust this to control how much brighter the color becomes
+
+const getContrastingGlowColor = (hexColor) => {
+    // Convert hex to RGB
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+
+    // Calculate brightness
+    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+
+    // Adjust the color to be lighter or darker based on brightness
+    const adjustmentFactor = brightness > 128 ? DARKEN_FACTOR : LIGHTEN_FACTOR;
+    const adjust = (channel) =>
+        Math.min(255, Math.max(0, Math.round(channel * adjustmentFactor)));
+
+    const adjustedR = adjust(r);
+    const adjustedG = adjust(g);
+    const adjustedB = adjust(b);
+
+    // Return the adjusted color in hex format
+    return `#${adjustedR.toString(16).padStart(2, '0')}${adjustedG
+        .toString(16)
+        .padStart(2, '0')}${adjustedB.toString(16).padStart(2, '0')}`;
+};
+
+const GridCanvas = ({ showGrid, scannedColumn, intersectedDots, gridConfig, colorSlots }) => {
     const canvasRef = useRef(null);
+
+    const { numDotsX, numDotsY, dotRadius } = gridConfig; // Destructure grid configuration
 
     const drawGlowingDot = (ctx, x, y, color) => {
         ctx.save(); // Save the context state
-    
+
+        // Get a contrasting glow color
+        const glowColor = getContrastingGlowColor(color);
+
         const glowLayers = [
-            { blur: 30, sizeMultiplier: 5, color: `${color}33` },  // Softer outer glow
-            { blur: 20, sizeMultiplier: 4, color: `${color}55` },    // Mid glow
-            { blur: 10, sizeMultiplier: 3, color: `${color}99` },     // Inner glow
-            { blur: 5, sizeMultiplier: 2.5, color: `${color}CC` }    // Core glow, slightly transparent
+            { blur: 30, sizeMultiplier: 4, color: `${glowColor}33` },  // Softer outer glow
+            { blur: 20, sizeMultiplier: 2, color: `${glowColor}55` }, // Mid glow
+            { blur: 10, sizeMultiplier: 0.7, color: `${glowColor}99` }, // Inner glow
+            { blur: 5, sizeMultiplier: 0.1, color: `${glowColor}CC` } // Core glow, slightly transparent
         ];
     
         glowLayers.forEach(({ blur, sizeMultiplier, color }) => {
@@ -50,13 +82,14 @@ const GridCanvas = ({ showGrid, scannedColumn, intersectedDots }) => {
             ctx.shadowBlur = blur;
             ctx.fillStyle = color;
             
-            // ctx.beginPath();
+            ctx.beginPath();
             const size = dotRadius * sizeMultiplier;
             // ctx.arc(x, y, dotRadius * sizeMultiplier, 0, Math.PI * 2);
-            drawStar(ctx, x, y, size, color); // Draw star
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            // drawStar(ctx, x, y, size, color); // Draw star
 
-            // ctx.closePath();
-            // ctx.fill();
+            ctx.closePath();
+            ctx.fill();
         });
     
         ctx.restore(); // Restore the original context state
@@ -110,10 +143,21 @@ const GridCanvas = ({ showGrid, scannedColumn, intersectedDots }) => {
             const isIntersected = Boolean(intersectData);
     
             // Check if the intersected dot's color is the eraser (background color)
-            const isBackgroundColor = intersectData?.color === ERASER_COLOR;
+            // const isBackgroundColor = intersectData?.color === ERASER_COLOR;
+
+            // Check if the intersected dot's color corresponds to the eraser slot
+            const isBackgroundColor = intersectData?.color === colorSlots.eraser;
+            
+            // console.log(`Intersect Data Color: ${intersectData?.color}, Eraser Color: ${ERASER_COLOR}`);
+            const lineColor = intersectData?.color;
+
+
+            // Debugging: Log intersectedDots and the color
+            // console.log(`Column: ${column}, Row: ${j}, IntersectData:`, intersectData);
     
             if (isScanned && isIntersected && !isBackgroundColor) {
-                const lineColor = intersectData.color;
+                // const lineColor = intersectData.color;
+                console.log('Scanned and intersected dot color:', lineColor);
                 drawGlowingDot(ctx, x, y, lineColor); // Draw intense glow
             } else if (isScanned) {
                 drawSmoothDot(ctx, x, y, 'rgba(255, 88, 51, 0.11)', true); // Mild glow for scanned dots
@@ -132,32 +176,15 @@ const GridCanvas = ({ showGrid, scannedColumn, intersectedDots }) => {
     
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-    
-        // const resizeCanvas = () => {
-        //     canvas.width = window.innerWidth;
-        //     canvas.height = window.innerHeight;
-        //     if (showGrid) {
-        //         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        //         for (let i = firstColumn; i < numDotsX; i++) {
-        //             drawColumn(ctx, i, canvas.width, canvas.height);
-        //         }
-        //     }
-        // };
 
         const resizeCanvas = () => {
             const container = document.querySelector('.canvas-container');
-            // if (!container) {
-            //     console.error('canvas-container not found');
-            //     return;
-            // } else {
-            //     console.log('canvas-container found');
-            // }
             const containerWidth = container.clientWidth;
             const containerHeight = container.clientHeight;
 
             canvasDimensions.width = containerWidth;
             canvasDimensions.height = containerHeight;
-            
+
             // console.log('containerWidth:', containerWidth);
             // console.log('containerHeight:', containerHeight);
             canvas.width = containerWidth; // Adjust canvas size to container width
@@ -170,14 +197,14 @@ const GridCanvas = ({ showGrid, scannedColumn, intersectedDots }) => {
                 }
             }
         };
-    
+
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
     
         return () => {
             window.removeEventListener('resize', resizeCanvas);
         }; 
-    }, [showGrid]); // Add showGrid as a dependency
+    }, [gridConfig, showGrid]); // Add showGrid as a dependency
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -193,6 +220,10 @@ const GridCanvas = ({ showGrid, scannedColumn, intersectedDots }) => {
             }
         }
     }, [scannedColumn, intersectedDots, showGrid]); // Redraw only the scanned column
+
+    useEffect(() => {
+        console.log('Received Intersected Dots in GridCanvas:', intersectedDots);
+      }, [intersectedDots]);
 
     return showGrid ? <canvas ref={canvasRef} className="grid-canvas" /> : null;
 };

@@ -27,6 +27,9 @@ import harmonicMinorIcon from './../../assets/icons/moon-fog-svgrepo-com-3.svg';
 import melodicMinorIcon from './../../assets/icons/saturn-science-svgrepo-com-3.svg';
 import minorPentatonicIcon from './../../assets/icons/five-stars-quality-symbol-svgrepo-com.svg';
 import majorPentatonicIcon from './../../assets/icons/star-rings-svgrepo-com.svg';
+import GearIcon from './../../assets/icons/gear-svgrepo-com.svg';
+import EditIcon from './../../assets/icons/edit-svgrepo-com.svg';
+import PaletteIcon from './../../assets/icons/palette-svgrepo-com-2.svg';
 
 
 export const instrumentIcons = {
@@ -80,6 +83,7 @@ export {
     LoopIcon,
     TempoIcon,
     GridIcon,
+    GearIcon,
     TrashIcon,
     quitIcon,
     NoLoopIcon,
@@ -100,4 +104,6 @@ export {
     melodicMinorIcon,
     minorPentatonicIcon,
     majorPentatonicIcon,
+    PaletteIcon,
+    EditIcon
   };
