@@ -584,13 +584,13 @@ const CanvasComponent = () => {
     setIsClearScreenPopupVisible(false); // Hide the pop-up
   };
 
-  // useEffect(() => {
-  //   const loadSounds = async () => {
-  //     await preloadSounds(); // Preload sounds
-  //     setIsLoading(false);   // Hide pop-up after loading
-  //   };
-  //   loadSounds();
-  // }, []);
+  useEffect(() => {
+    const loadSounds = async () => {
+      await preloadSounds(); // Preload sounds
+      setIsLoading(false);   // Hide pop-up after loading
+    };
+    loadSounds();
+  }, []);
 
   useEffect(() => {
     const loadEverything = async () => {
