@@ -9,6 +9,7 @@ import { getStrokePoints, getStrokeOutlinePoints } from 'perfect-freehand'; // I
 const pointInterpolationDivisor = 10; // Adjust this value to control the density of interpolated points
 
 const CanvasComponent = () => {
+  const [activePointerId, setActivePointerId] = useState(null); // Track the active pointer ID
   const { playbackSpeed, setPlaybackSpeed } = usePlaybackSpeed(); // Access playbackSpeed
   const [sonificationPoints, setSonificationPoints] = useState([]); // Points that trigger sounds
   const [lines, setLines] = useState([]); // List of drawn lines
