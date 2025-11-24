@@ -308,7 +308,22 @@ const CanvasComponent = () => {
   };
 
   const confirmSaveDrawing = () => {
-    const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+    // const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+    const dataToSave = {
+      // Drawing data
+      lines,                    // All line objects with their intersections
+      
+      // Instrument mapping
+      idInstrumentMap,          // CRITICAL - maps lineId to instrument
+      
+      // UI/Playback state
+      colorInstrumentMap,       // Current color slot -> instrument mapping
+      colorSlots,              // Custom colors for each slot
+      currentScale,            // Musical scale (e.g., 'pentatonicMinor')
+      gridIndex,               // Which grid config (0-5)
+      bpm,                     // Tempo
+      volume,                  // Master volume
+    };
 
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svgRef.current);
@@ -335,7 +350,22 @@ const CanvasComponent = () => {
   // };
 
   const confirmSaveAsJson = () => {
-    const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+    // const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+    const dataToSave = {
+      // Drawing data
+      lines,                    // All line objects with their intersections
+      
+      // Instrument mapping
+      idInstrumentMap,          // CRITICAL - maps lineId to instrument
+      
+      // UI/Playback state
+      colorInstrumentMap,       // Current color slot -> instrument mapping
+      colorSlots,              // Custom colors for each slot
+      currentScale,            // Musical scale (e.g., 'pentatonicMinor')
+      gridIndex,               // Which grid config (0-5)
+      bpm,                     // Tempo
+      volume,                  // Master volume
+    };
 
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svgRef.current);
@@ -465,6 +495,45 @@ const CanvasComponent = () => {
     setIsSavePopupVisible(false); // Hide the pop-up
   };
 
+  // const handleLoadDrawing = (e) => {
+  //   const file = e.target.files[0];
+  //   if (!file) return;
+
+  //   const reader = new FileReader();
+  //   reader.onload = (event) => {
+  //     const jsonData = JSON.parse(event.target.result);
+
+  //     if (jsonData.dataset) {
+  //       const loadedLines = jsonData.dataset.lines || [];
+  //       const loadedSonificationPoints = jsonData.dataset.sonificationPoints || [];
+  //       const loadedColorInstrumentMap = jsonData.dataset.colorInstrumentMap || {};
+
+  //       // Update the state with loaded data
+  //       setLines(loadedLines);
+  //       setSonificationPoints(loadedSonificationPoints);
+  //       setColorInstrumentMap(loadedColorInstrumentMap);
+
+  //       // Rebuild intersectedDots to link sonification points for playback
+  //       const updatedIntersectedDots = {};
+  //       loadedLines.forEach((line) => {
+  //         if (line.intersections) {
+  //           Object.entries(line.intersections).forEach(([column, rows]) => {
+  //             if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
+  //             Object.entries(rows).forEach(([row, intersectionData]) => {
+  //               updatedIntersectedDots[column][row] = intersectionData;
+  //             });
+  //           });
+  //         }
+  //       });
+
+  //       // Update the intersectedDots reference
+  //       intersectedDots.current = updatedIntersectedDots;
+  //     }
+  //   };
+
+  //   reader.readAsText(file);
+  // };
+
   const handleLoadDrawing = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -474,14 +543,59 @@ const CanvasComponent = () => {
       const jsonData = JSON.parse(event.target.result);
 
       if (jsonData.dataset) {
-        const loadedLines = jsonData.dataset.lines || [];
-        const loadedSonificationPoints = jsonData.dataset.sonificationPoints || [];
-        const loadedColorInstrumentMap = jsonData.dataset.colorInstrumentMap || {};
-
-        // Update the state with loaded data
+        const loadedData = jsonData.dataset;
+        
+        // Load drawing data
+        const loadedLines = loadedData.lines || [];
         setLines(loadedLines);
-        setSonificationPoints(loadedSonificationPoints);
+        
+        // Load instrument mappings
+        const loadedIdInstrumentMap = loadedData.idInstrumentMap || {};
+        setIdInstrumentMap(loadedIdInstrumentMap);
+        
+        const loadedColorInstrumentMap = loadedData.colorInstrumentMap || {
+          color1: 'piano',
+          color2: 'epiano',
+          color3: 'marimba',
+        };
         setColorInstrumentMap(loadedColorInstrumentMap);
+        
+        // Load UI/Playback state
+        const loadedColorSlots = loadedData.colorSlots || {
+          color1: '#a9103a',
+          color2: '#043293',
+          color3: '#fead36',
+          eraser: '#eae6e0'
+        };
+        setColorSlots(loadedColorSlots);
+        
+        const loadedScale = loadedData.currentScale || 'pentatonicMinor';
+        setCurrentScale(loadedScale);
+        setScale(loadedScale); // Apply to global scale mapping
+        
+        const loadedGridIndex = loadedData.gridIndex !== undefined ? loadedData.gridIndex : 2;
+        setGridIndex(loadedGridIndex);
+        setGridConfig(gridConfigurations[loadedGridIndex]);
+        
+        const loadedBpm = loadedData.bpm || 250;
+        setBpm(loadedBpm);
+        
+        const loadedVolume = loadedData.volume !== undefined ? loadedData.volume : 0.8;
+        setVolume(loadedVolume);
+        setMasterVolume(loadedVolume); // Apply to audio system
+
+        // Rebuild intersectedDots to link sonification points for playback
+        // const updatedIntersectedDots = {};
+        // loadedLines.forEach((line) => {
+        //   if (line.intersections) {
+        //     Object.entries(line.intersections).forEach(([column, rows]) => {
+        //       if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
+        //       Object.entries(rows).forEach(([row, intersectionData]) => {
+        //         updatedIntersectedDots[column][row] = intersectionData;
+        //       });
+        //     });
+        //   }
+        // });
 
         // Rebuild intersectedDots to link sonification points for playback
         const updatedIntersectedDots = {};
@@ -490,7 +604,11 @@ const CanvasComponent = () => {
             Object.entries(line.intersections).forEach(([column, rows]) => {
               if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
               Object.entries(rows).forEach(([row, intersectionData]) => {
-                updatedIntersectedDots[column][row] = intersectionData;
+                updatedIntersectedDots[column][row] = {
+                  ...intersectionData,
+                  color: line.color,              // Use the line's actual hex color
+                  highlightColor: line.highlightColor || line.color  // Use the line's highlight color
+                };
               });
             });
           }
