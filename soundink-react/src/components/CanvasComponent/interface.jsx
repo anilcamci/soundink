@@ -292,7 +292,7 @@ const CanvasComponent = () => {
     setIsSavePopupVisible(true);
   };
 
-  const handleSave = async ({ saveJson, saveImage, saveAudio }) => {
+  const handleSave = async ({ saveJson, saveImage, saveAudio, audioLoops }) => {
     if (saveJson) {
       confirmSaveAsJson();
     }
@@ -300,7 +300,7 @@ const CanvasComponent = () => {
       confirmSaveAsImage();
     }
     if (saveAudio) {
-      await confirmSaveAsAudio();
+      await confirmSaveAsAudio(audioLoops);
     }
 
     setIsDownloading(false);
@@ -426,8 +426,8 @@ const CanvasComponent = () => {
     a.click();
   };
 
-  const confirmSaveAsAudio = async () => {
-    console.log("Starting audio export...");
+  const confirmSaveAsAudio = async (loops = 0) => {
+    console.log(`Starting audio export with ${loops + 1} iteration(s)...`);
 
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const destination = audioContext.createMediaStreamDestination();
@@ -454,44 +454,46 @@ const CanvasComponent = () => {
     recorder.start();
     console.log("Recorder started.");
 
-    // Play the sonification points without looping
-    for (let column = firstColumn; column < gridConfigRef.current.numDotsX; column++) {
-      if (intersectedDots.current[column]) {
-        const playPromises = [];
-        
-        // Determine if this is an accent column
-        const isAccentColumn = (column - firstColumn) % gridConfigRef.current.accent === 0;
-        
-        for (const row in intersectedDots.current[column]) {
-          const { color, lineId } = intersectedDots.current[column][row];
-          const instrument = idInstrumentMapRef.current[lineId];
-          const mapRowToNote = getMapRowToNote();
-          const note = mapRowToNote[row];
+    // Play the sonification with the specified number of loops
+    for (let iteration = 0; iteration <= loops; iteration++) {
+      for (let column = firstColumn; column < gridConfigRef.current.numDotsX; column++) {
+        if (intersectedDots.current[column]) {
+          const playPromises = [];
+          
+          // Determine if this is an accent column
+          const isAccentColumn = (column - firstColumn) % gridConfigRef.current.accent === 0;
+          
+          for (const row in intersectedDots.current[column]) {
+            const { color, lineId } = intersectedDots.current[column][row];
+            const instrument = idInstrumentMapRef.current[lineId];
+            const mapRowToNote = getMapRowToNote();
+            const note = mapRowToNote[row];
 
-          playPromises.push(
-            playSound(
-              color,
-              note,
-              1,
-              playbackSpeedRef.current,
-              lineId,
-              { [color]: instrument },
-              isAccentColumn,
-              audioContext,
-              destination
-            )
-          );
+            playPromises.push(
+              playSound(
+                color,
+                note,
+                1,
+                playbackSpeedRef.current,
+                lineId,
+                { [color]: instrument },
+                isAccentColumn,
+                audioContext,
+                destination
+              )
+            );
+          }
+          await Promise.all(playPromises);
         }
-        await Promise.all(playPromises);
-      }
 
-      await new Promise(resolve =>
-        setTimeout(resolve, playbackSpeedRef.current)
-      );
+        await new Promise(resolve =>
+          setTimeout(resolve, playbackSpeedRef.current)
+        );
+      }
     }
 
     // Ensure all audio is played before stopping the recorder
-    const totalDuration = playbackSpeedRef.current * (gridConfigRef.current.numDotsX - firstColumn);
+    const totalDuration = playbackSpeedRef.current * (gridConfigRef.current.numDotsX - firstColumn) * (loops + 1);
     setTimeout(() => {
       recorder.stop();
       console.log("Recorder stopped.");
@@ -1501,9 +1503,10 @@ const CanvasComponent = () => {
     const [saveJson, setSaveJson] = useState(true);
     const [saveImage, setSaveImage] = useState(true);
     const [saveAudio, setSaveAudio] = useState(true);
+    const [audioLoops, setAudioLoops] = useState(0);
 
     const handleSave = () => {
-      onSave({ saveJson, saveImage, saveAudio });
+      onSave({ saveJson, saveImage, saveAudio, audioLoops });
     };
 
     return (
@@ -1536,6 +1539,21 @@ const CanvasComponent = () => {
               />
               Save as Audio
             </label>
+            {saveAudio && (
+              <div style={{ marginLeft: '24px', marginTop: '8px' }}>
+                <label style={{ fontSize: '0.9em', color: '#666' }}>
+                  Loops: {audioLoops}
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={audioLoops}
+                    onChange={(e) => setAudioLoops(Number(e.target.value))}
+                    style={{ width: '100%', marginTop: '4px' }}
+                  />
+                </label>
+              </div>
+            )}
           </div>
           <div className="popup-buttons">
             <button onClick={handleSave}>Download</button>
