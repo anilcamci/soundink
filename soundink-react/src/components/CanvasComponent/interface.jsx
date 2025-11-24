@@ -398,8 +398,12 @@ const CanvasComponent = () => {
     const ctx = canvas.getContext("2d");
 
     const svgSize = svgElement.getBoundingClientRect();
-    canvas.width = svgSize.width;
-    canvas.height = svgSize.height;
+    const scale = 3;
+    canvas.width = svgSize.width * scale;
+    canvas.height = svgSize.height * scale;
+
+    // Scale the context to match
+    ctx.scale(scale, scale);
 
     // Draw a white background
     ctx.fillStyle = '#eae6e1';
@@ -495,45 +499,6 @@ const CanvasComponent = () => {
     setIsSavePopupVisible(false); // Hide the pop-up
   };
 
-  // const handleLoadDrawing = (e) => {
-  //   const file = e.target.files[0];
-  //   if (!file) return;
-
-  //   const reader = new FileReader();
-  //   reader.onload = (event) => {
-  //     const jsonData = JSON.parse(event.target.result);
-
-  //     if (jsonData.dataset) {
-  //       const loadedLines = jsonData.dataset.lines || [];
-  //       const loadedSonificationPoints = jsonData.dataset.sonificationPoints || [];
-  //       const loadedColorInstrumentMap = jsonData.dataset.colorInstrumentMap || {};
-
-  //       // Update the state with loaded data
-  //       setLines(loadedLines);
-  //       setSonificationPoints(loadedSonificationPoints);
-  //       setColorInstrumentMap(loadedColorInstrumentMap);
-
-  //       // Rebuild intersectedDots to link sonification points for playback
-  //       const updatedIntersectedDots = {};
-  //       loadedLines.forEach((line) => {
-  //         if (line.intersections) {
-  //           Object.entries(line.intersections).forEach(([column, rows]) => {
-  //             if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
-  //             Object.entries(rows).forEach(([row, intersectionData]) => {
-  //               updatedIntersectedDots[column][row] = intersectionData;
-  //             });
-  //           });
-  //         }
-  //       });
-
-  //       // Update the intersectedDots reference
-  //       intersectedDots.current = updatedIntersectedDots;
-  //     }
-  //   };
-
-  //   reader.readAsText(file);
-  // };
-
   const handleLoadDrawing = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -583,19 +548,6 @@ const CanvasComponent = () => {
         const loadedVolume = loadedData.volume !== undefined ? loadedData.volume : 0.8;
         setVolume(loadedVolume);
         setMasterVolume(loadedVolume); // Apply to audio system
-
-        // Rebuild intersectedDots to link sonification points for playback
-        // const updatedIntersectedDots = {};
-        // loadedLines.forEach((line) => {
-        //   if (line.intersections) {
-        //     Object.entries(line.intersections).forEach(([column, rows]) => {
-        //       if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
-        //       Object.entries(rows).forEach(([row, intersectionData]) => {
-        //         updatedIntersectedDots[column][row] = intersectionData;
-        //       });
-        //     });
-        //   }
-        // });
 
         // Rebuild intersectedDots to link sonification points for playback
         const updatedIntersectedDots = {};
