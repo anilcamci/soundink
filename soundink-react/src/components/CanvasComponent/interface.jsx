@@ -427,40 +427,44 @@ const CanvasComponent = () => {
   };
 
   const confirmSaveAsAudio = async () => {
-    // console.log("Starting audio recording...");
+    console.log("Starting audio export...");
 
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const destination = audioContext.createMediaStreamDestination();
     const recorder = new MediaRecorder(destination.stream);
     const chunks = [];
-    // const recorder = new MediaRecorder(stream, {mimeType: 'audio/wav'});
 
     recorder.ondataavailable = (event) => {
       chunks.push(event.data);
     };
 
     recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'audio/mp3' });
+      const blob = new Blob(chunks, { type: 'audio/webm' });
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'sonification.mp3';
+      a.download = 'sonification.webm';
       a.click();
 
       URL.revokeObjectURL(url);
-      // console.log("Audio recording saved.");
+      console.log("Audio export completed.");
     };
 
     recorder.start();
-    // console.log("Recorder started.");
+    console.log("Recorder started.");
 
     // Play the sonification points without looping
-    for (let column = firstColumn; column < numDotsX; column++) {
+    for (let column = firstColumn; column < gridConfigRef.current.numDotsX; column++) {
       if (intersectedDots.current[column]) {
         const playPromises = [];
+        
+        // Determine if this is an accent column
+        const isAccentColumn = (column - firstColumn) % gridConfigRef.current.accent === 0;
+        
         for (const row in intersectedDots.current[column]) {
-          const { color } = intersectedDots.current[column][row];
+          const { color, lineId } = intersectedDots.current[column][row];
+          const instrument = idInstrumentMapRef.current[lineId];
           const mapRowToNote = getMapRowToNote();
           const note = mapRowToNote[row];
 
@@ -470,9 +474,9 @@ const CanvasComponent = () => {
               note,
               1,
               playbackSpeedRef.current,
-              intersectedDots.current[column][row].lineId,
-              colorInstrumentMapRef.current,
-              false,
+              lineId,
+              { [color]: instrument },
+              isAccentColumn,
               audioContext,
               destination
             )
@@ -487,11 +491,10 @@ const CanvasComponent = () => {
     }
 
     // Ensure all audio is played before stopping the recorder
-    const totalDuration = playbackSpeedRef.current * numDotsX;
+    const totalDuration = playbackSpeedRef.current * (gridConfigRef.current.numDotsX - firstColumn);
     setTimeout(() => {
       recorder.stop();
-      // console.log("Recorder stopped.");
-      // setIsSavePopupVisible(false); // Hide the pop-up
+      console.log("Recorder stopped.");
     }, totalDuration);
   };
 

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "canvg": "^4.0.2",
+    "lamejs": "^1.2.1",
     "p5": "^1.11.0",
     "perfect-freehand": "^1.2.2",
     "point-in-polygon": "^1.1.0",
