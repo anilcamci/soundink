@@ -825,46 +825,50 @@ const CanvasComponent = () => {
     return points;
   };
 
-  const alignDotsToGrid = (scaleX, scaleY) => {
-    const updatedDots = {};
-
-    Object.keys(intersectedDots.current).forEach((colIndex) => {
-      updatedDots[colIndex] = {};
-      Object.keys(intersectedDots.current[colIndex]).forEach((rowIndex) => {
-        const dot = intersectedDots.current[colIndex][rowIndex];
-        updatedDots[colIndex][rowIndex] = {
-          x: dot.x * scaleX,
-          y: dot.y * scaleY,
-          color: dot.color,
-        };
-      });
-    });
-
-    return updatedDots;
-  };
-
   const handleResize = () => {
     const container = document.querySelector('.canvas-container');
+    if (!container) return;
+    
     const newWidth = container.clientWidth;
     const newHeight = container.clientHeight;
+
+    // Skip if dimensions haven't actually changed
+    if (newWidth === originalSvgSize.current.width && newHeight === originalSvgSize.current.height) {
+      return;
+    }
 
     // Calculate scale factors
     const scaleX = newWidth / originalSvgSize.current.width;
     const scaleY = newHeight / originalSvgSize.current.height;
 
-    // Update each line's points
-    const resizedLines = lines.map((line) => ({
-      ...line,
-      points: line.points.map(([x, y]) => [x * scaleX, y * scaleY]), // Scale points
-    }));
+    // Update each line's points and recalculate intersections
+    const resizedLines = lines.map((line) => {
+      const scaledPoints = line.points.map(([x, y]) => [x * scaleX, y * scaleY]);
+      
+      // Create a new line object with scaled points
+      const scaledLine = {
+        ...line,
+        points: scaledPoints,
+        intersections: {}, // Reset intersections, will be recalculated
+      };
+      
+      return scaledLine;
+    });
 
-    // Update `lines` with resized data
+    // Recalculate all intersections with the grid
+    const updatedIntersectedDots = {};
+    const spatialHash = createSpatialHash(gridConfigRef.current);
+
+    resizedLines.forEach((line) => {
+      calculateIntersections(line, gridConfigRef.current, updatedIntersectedDots, spatialHash);
+    });
+
+    // Update lines and intersections
     setLines(resizedLines);
+    intersectedDots.current = updatedIntersectedDots;
+    setIntersectedDotsState({ ...updatedIntersectedDots });
 
-    // Recalculate the positions of sonification dots
-    intersectedDots.current = alignDotsToGrid(scaleX, scaleY);
-
-    // Update the original size
+    // Update the original size reference
     originalSvgSize.current = { width: newWidth, height: newHeight };
   };
 
@@ -873,14 +877,7 @@ const CanvasComponent = () => {
     window.addEventListener('resize', resizeListener);
 
     return () => window.removeEventListener('resize', resizeListener);
-  }, [lines, intersectedDots]);
-
-  useEffect(() => {
-    const resizeListener = () => handleResize();
-    window.addEventListener('resize', resizeListener);
-
-    return () => window.removeEventListener('resize', resizeListener);
-  }, [lines, intersectedDots]);
+  }, [lines, gridConfig]);
 
   // Handles the slider input for changing playback speed
   const handleSliderChange = (e) => {
