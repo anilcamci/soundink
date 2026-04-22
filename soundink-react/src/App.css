@@ -5,6 +5,11 @@
   height: 100vh;
 }
 
+/* Lock the screen to prevent scrolling */
+body.lock-scroll {
+  overflow: hidden;
+}
+
 /* Grid canvas is overlaid behind other elements, 
    pointer-events disabled so it doesn't interfere with drawing */
 .grid-canvas {

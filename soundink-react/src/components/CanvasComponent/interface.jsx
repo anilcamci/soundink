@@ -1,0 +1,2472 @@
+import React, { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react';
+import './interface.css'; // Importing the associated CSS file for styles
+import { PlayIcon, StopIcon, UndoIcon, RedoIcon, BrushIcon, EraseIcon, TempoIcon, GridIcon, GearIcon, TrashIcon, quitIcon, downloadIcon, uploadIcon, CleanIcon, muteIcon, bassIcon, guitarIcon, marimbaIcon, pianoIcon, violinIcon, fluteIcon, glassIcon, synthIcon, majorIcon, harmonicMinorIcon, melodicMinorIcon, minorPentatonicIcon, majorPentatonicIcon, instrumentIcons, scaleIcons, customInstrumentNames, customScaleNames, colors, sizes, MAX_DELAY, ERASER_COLOR, options, isPointNearDot, isPointNearLineSegment, useBpm, usePlaybackSpeed, useMediaQuery, uuidv4, stopSoundsForLine, preloadSounds, resumeAudioContext, getSvgPathFromStroke, getStroke, getMapRowToNote, setScale, playSound, GridCanvas, firstColumn, fistColumnScan, numDotsX, numDotsY, dotRadius, canvasDimensions, gridConfigurations, setMasterVolume, getStrokeWidthFromOptions, calculateLocalWidth, PaletteIcon, EditIcon } from './import'; // Importing the necessary functions and constants from the import file
+import { mapNoteToSampleNumber, scales } from './soundMappings';
+import { Canvg } from 'canvg';
+import pointInPolygon from 'point-in-polygon'; // Import the library
+import { getStrokePoints, getStrokeOutlinePoints } from 'perfect-freehand'; // Importing the necessary functions from perfect-freehand
+
+const pointInterpolationDivisor = 10; // Adjust this value to control the density of interpolated points
+
+const CanvasComponent = () => {
+  const [activePointerId, setActivePointerId] = useState(null); // Track the active pointer ID
+  const { playbackSpeed, setPlaybackSpeed } = usePlaybackSpeed(); // Access playbackSpeed
+  const [sonificationPoints, setSonificationPoints] = useState([]); // Points that trigger sounds
+  const [lines, setLines] = useState([]); // List of drawn lines
+  const [currentLine, setCurrentLine] = useState([]); // Current line being drawn
+  const [currentColor, setCurrentColor] = useState('color1'); // Currently selected brush color
+  const [currentSize, setCurrentSize] = useState(30); // Currently selected brush size
+  const previousToolStateRef = useRef({currentColor: 'color1', isTrash: false, isEraser: false,}); // Track previous state
+  const [isEraser, setIsEraser] = useState(false); // Toggle for eraser mode
+  const [isTrash, setIsTrash] = useState(false); // Toggle for trash mode
+  const [undoStack, setUndoStack] = useState([]); // Stack for undo functionality
+  const [redoStack, setRedoStack] = useState([]); // Stack for redo functionality
+  const [currentColumn, setCurrentColumn] = useState(-1); // Current column being played back (for visual feedback)
+  const intersectedDots = useRef({}); // Ref to track intersected dots
+  const [showGrid, setShowGrid] = useState(true); // Add state to control grid visibility
+  const [isPlaying, setIsPlaying] = useState(false); // To control playback state
+  // const [loop, setLoop] = useState(true); // To control looping
+  let playbackStopped = useRef(false); // To stop playback externally
+  const [scannedColumn, setScannedColumn] = useState(-1);
+  const [previousColor, setPreviousColor] = useState(colors[0]);
+  const [currentScale, setCurrentScale] = useState('pentatonicMinor'); // Default scale is harmonic minor
+  const [isScaleMenuOpen, setIsScaleMenuOpen] = useState(false); // Toggle for pop-up
+  const { bpm, setBpm } = useBpm(); // Access bpm and setBpm from context
+  const scaleMenuRef = useRef(null); // Ref for the scale menu
+  const instrumentMenuRef = useRef(null); // Ref for the instrument menu
+  const originalSvgSize = useRef({ width: window.innerWidth, height: window.innerHeight });
+  const [isLoading, setIsLoading] = useState(true); // Initial loading state
+  const [isDownloading, setIsDownloading] = useState(false); // State for downloading files
+  const [isClearScreenPopupVisible, setIsClearScreenPopupVisible] = useState(false);
+  const [isSavePopupVisible, setIsSavePopupVisible] = useState(false);
+  const [isPhoneMenuOpen, setIsPhoneMenuOpen] = useState(false);
+  const svgRef = useRef();
+  let loadInputRef = null; // Create a ref for the hidden input element
+  const clearScreenPopupRef = useRef(null);
+  const savePopupRef = useRef(null);
+  const [gridIndex, setGridIndex] = useState(2); // Default grid configuration
+  const [gridConfig, setGridConfig] = useState(gridConfigurations[gridIndex]);
+  const gridConfigRef = useRef(gridConfig); // Create a ref for gridConfig
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef(null);
+  const [volume, setVolume] = useState(0.8); // Default volume is 80%
+  const [activeColorSlot, setActiveColorSlot] = useState(null); // Tracks the slot for which the palette is open
+  const colorPaletteRef = useRef(null); // Ref for the color palette modal
+
+  const [selectedColor, setSelectedColor] = useState(null); // Track the color for which the modal is shown
+  const [selectedSlot, setSelectedSlot] = useState(null); // Track the selected slot for the combined menu
+  const [isEditMode, setIsEditMode] = useState(false); // Tracks if Edit Mode is active
+  const [selectedLine, setSelectedLine] = useState(null); // Tracks the line being edited
+
+  const [isDragging, setIsDragging] = useState(false); // Tracks if a line is being dragged
+  const [draggedLine, setDraggedLine] = useState(null); // Tracks the line being dragged
+  const [dragOffset, setDragOffset] = useState([0, 0]); // Tracks the offset between the pointer and the line
+  const [originalLinePoints, setOriginalLinePoints] = useState(null); // Store the original points of the dragged line
+  const [initialDragPoint, setInitialDragPoint] = useState(null); // Store the initial cursor position
+  const [intersectedDotsState, setIntersectedDotsState] = useState({});
+  const [wasDragged, setWasDragged] = useState(false);
+  const didActuallyDragRef = useRef(false); // ref mirror used only for undo commit in pointer-up
+  const clickPointRef = useRef(null); // Temporary global variable for clickPoint
+
+  const [selectedLineIds, setSelectedLineIds] = useState([]);
+  const selectedLineIdsRef = useRef([]);
+  const [isSweepSelecting, setIsSweepSelecting] = useState(false);
+  const [boxSelectCurrent, setBoxSelectCurrent] = useState(null);
+  const isSweepErasingRef = useRef(false);
+  const sweepEraseSnapshotRef = useRef(null);
+  const sweepErasedRef = useRef(false);
+  const lastErasePointRef = useRef(null);
+  const [draggedLineIds, setDraggedLineIds] = useState([]);
+
+  const originalDraggedLinesPointsRef = useRef({});
+  const pendingDragSnapshot = useRef(null);
+  
+  // State to hold instrument assignment for each color
+  const [colorInstrumentMap, setColorInstrumentMap] = useState({
+    color1: 'piano',
+    color2: 'epiano',
+    color3: 'marimba',
+  });
+
+  const [idInstrumentMap, setIdInstrumentMap] = useState({});
+  const idInstrumentMapRef = useRef(idInstrumentMap);
+
+  // Add a new state to manage the colors for each slot
+  const [colorSlots, setColorSlots] = useState({
+    color1: '#a9103a',
+    color2: '#043293',
+    color3: '#fead36',
+    eraser: '#eae6e0'
+  });
+
+  const getSlotFromColor = (color) => {
+    return Object.keys(colorSlots).find((slot) => colorSlots[slot] === color);
+  };
+
+
+  const colorPaletteGrid = [
+    ['#FFFB00', '#FEE22A', '#FEC92C', '#FF9300', '#743B13'],
+    ['#FFBAC5', '#FF7D8E', '#FF759E', '#FF0051', '#C90347'],
+    ['#FFD0F5', '#FF9CDD', '#FF61DF', '#CB00FF', '#770088'],
+    ['#C9FCF0', '#89EAC9', '#37DFAF', '#3AFF1B', '#008538'],
+    ['#BAE6FC', '#48E5FF', '#07BBF1', '#0085FF', '#003C85'],
+    ['#FFFFFF', '#D5D5D5', '#8F8F8F', '#484848', '#000000'],
+  ];
+
+
+  // Define the available instrument options
+  // const instrumentOptions = ['piano', 'marimba', 'bass', 'guitar', 'epiano', 'floom', 'strings', 'synthflute', 'mute'];
+  const instrumentOptions = ['piano', 'marimba', 'guitar', 'epiano', 'synthflute', 'mute'];
+
+  // Inside your component
+  const colorInstrumentMapRef = useRef(colorInstrumentMap); // Create a ref for instrument mappings
+  // const loopRef = useRef(loop); // Create a ref for loop
+  const playbackSpeedRef = useRef(playbackSpeed);
+  const playStopButtonRef = useRef(null);
+
+  // Define breakpoints
+  const isMobile = useMediaQuery({ maxWidth: 768 });
+  const isTablet = useMediaQuery({ minWidth: 769, maxWidth: 1024 });
+  const isDesktop = useMediaQuery({ minWidth: 1025 });
+
+  // Dynamically adjust styles based on the screen size
+  const buttonSize = isMobile ? '40px' : isTablet ? '60px' : '80px';
+  const gapSize = isMobile ? '10px' : isTablet ? '15px' : '20px';
+  const sidebarWidth = isMobile ? '15vw' : '10vw';
+
+  useEffect(() => {
+    idInstrumentMapRef.current = idInstrumentMap; // Keep the ref in sync with the state
+  }, [idInstrumentMap]);
+
+  useEffect(() => {
+    selectedLineIdsRef.current = selectedLineIds;
+  }, [selectedLineIds]);
+
+  useEffect(() => {
+    gridConfigRef.current = gridConfig; // Update the ref whenever gridConfig changes
+  }, [gridConfig]);
+
+
+  // Function to check if a dot intersects with the stroke outline
+  const isDotIntersected = (dotX, dotY, strokeOutline) => {
+    return pointInPolygon([dotX, dotY], strokeOutline);
+  };
+
+  const createSpatialHash = (gridConfig) => {
+    const spatialHash = {};
+    const cellSizeX = canvasDimensions.width / gridConfig.numDotsX;
+    const cellSizeY = canvasDimensions.height / gridConfig.numDotsY;
+  
+    for (let i = 0; i < gridConfig.numDotsX; i++) {
+      for (let j = 0; j < gridConfig.numDotsY; j++) {
+        const dotX = cellSizeX * i + cellSizeX / 2;
+        const dotY = cellSizeY * j + cellSizeY / 2;
+        const cellKey = `${Math.floor(dotX / cellSizeX)},${Math.floor(dotY / cellSizeY)}`;
+  
+        if (!spatialHash[cellKey]) spatialHash[cellKey] = [];
+        spatialHash[cellKey].push({ x: dotX, y: dotY, col: i, row: j });
+      }
+    }
+  
+    return spatialHash;
+  };
+  
+  const calculateIntersections = (line, gridConfig, intersectedDots, spatialHash) => {
+    const interpolatedPoints = [];
+    for (let i = 0; i < line.points.length - 1; i++) {
+      const start = line.points[i];
+      const end = line.points[i + 1];
+      const distance = Math.hypot(end[0] - start[0], end[1] - start[1]);
+      const numInterpolatedPoints = Math.floor(distance / pointInterpolationDivisor);
+      interpolatedPoints.push(...interpolatePoints(start, end, numInterpolatedPoints));
+    }
+  
+    const allPoints = [...line.points, ...interpolatedPoints];
+    const cellSizeX = canvasDimensions.width / gridConfig.numDotsX;
+    const cellSizeY = canvasDimensions.height / gridConfig.numDotsY;
+  
+    allPoints.forEach((point) => {
+      const cellX = Math.floor(point[0] / cellSizeX);
+      const cellY = Math.floor(point[1] / cellSizeY);
+      const cellKey = `${cellX},${cellY}`;
+  
+      if (spatialHash[cellKey]) {
+        spatialHash[cellKey].forEach((dot) => {
+          if (isPointNearDot(point[0], point[1], dot.x, dot.y, gridConfig.dotRadius, line.size)) {
+            if (!intersectedDots[dot.col]) intersectedDots[dot.col] = {};
+            intersectedDots[dot.col][dot.row] = {
+              point: [dot.x, dot.y],
+              color: line.color,
+              highlightColor: line.highlightColor,
+              size: line.size,
+              lineId: line.lineId,
+              instrument: line.instrument,
+            };
+          }
+        });
+      }
+    });
+  };
+
+  const handleLongPress = (slot) => {
+    setActiveColorSlot(slot); // Open the color palette for the selected slot
+  };
+  
+  const closeColorPalette = () => {
+    setActiveColorSlot(null); // Close the color palette
+  };
+
+  let pressTimer;
+
+  const handleMouseDown = (slot) => {
+    pressTimer = setTimeout(() => handleLongPress(slot), 500); // 500ms for long press
+  };
+
+  const handleMouseUp = () => {
+    clearTimeout(pressTimer); // Clear the timer if the user releases early
+  };
+
+  const handleGridChange = (e) => {
+    const newIndex = Number(e.target.value);
+    setGridIndex(newIndex);
+    setGridConfig(gridConfigurations[newIndex]);
+  
+    const { numDotsX, numDotsY, dotRadius } = gridConfigurations[newIndex];
+  
+    // Adjust the current column based on the new grid configuration
+    setCurrentColumn((prevColumn) => {
+      if (prevColumn >= numDotsX) {
+        return 0; // Reset to the first column if out of range
+      }
+      return prevColumn;
+    });
+  
+    const updatedIntersectedDots = {};
+  
+    // Create a spatial hash for the new grid
+    const spatialHash = createSpatialHash(gridConfigurations[newIndex]);
+  
+    const updatedLines = lines.map((line) => {
+      const newIntersections = {};
+  
+      // Interpolate points for the line
+      const interpolatedPoints = [];
+      for (let i = 0; i < line.points.length - 1; i++) {
+        const start = line.points[i];
+        const end = line.points[i + 1];
+        const distance = Math.hypot(end[0] - start[0], end[1] - start[1]);
+        const numInterpolatedPoints = Math.floor(distance / pointInterpolationDivisor); // Adjust interpolation density
+        interpolatedPoints.push(...interpolatePoints(start, end, numInterpolatedPoints));
+      }
+  
+      const allPoints = [...line.points, ...interpolatedPoints]; // Combine original and interpolated points
+  
+      // Recalculate intersections for the new grid using spatial hashing
+      allPoints.forEach((point) => {
+        const cellSizeX = canvasDimensions.width / numDotsX;
+        const cellSizeY = canvasDimensions.height / numDotsY;
+        const cellX = Math.floor(point[0] / cellSizeX);
+        const cellY = Math.floor(point[1] / cellSizeY);
+        const cellKey = `${cellX},${cellY}`;
+  
+        if (spatialHash[cellKey]) {
+          spatialHash[cellKey].forEach((dot) => {
+            if (isPointNearDot(point[0], point[1], dot.x, dot.y, dotRadius, line.size)) {
+              if (!newIntersections[dot.col]) newIntersections[dot.col] = {};
+              if (!updatedIntersectedDots[dot.col]) updatedIntersectedDots[dot.col] = {};
+  
+              newIntersections[dot.col][dot.row] = {
+                point: [dot.x, dot.y],
+                color: line.color,
+                highlightColor: line.highlightColor,
+                size: line.size,
+                lineId: line.lineId,
+              };
+              updatedIntersectedDots[dot.col][dot.row] = {
+                point: [dot.x, dot.y],
+                color: line.color,
+                highlightColor: line.highlightColor,
+                size: line.size,
+                lineId: line.lineId,
+              };
+            }
+          });
+        }
+      });
+  
+      return { ...line, intersections: newIntersections };
+    });
+  
+    setLines(updatedLines);
+    intersectedDots.current = updatedIntersectedDots;
+  };
+
+  const handleSaveDrawing = () => {
+    setIsSavePopupVisible(true);
+  };
+
+  const handleSave = async ({ saveJson, saveImage, saveAudio, audioLoops }) => {
+    if (saveJson) {
+      confirmSaveAsJson();
+    }
+    if (saveImage) {
+      confirmSaveAsImage();
+    }
+    if (saveAudio) {
+      await confirmSaveAsAudio(audioLoops);
+    }
+
+    setIsDownloading(false);
+    setIsSavePopupVisible(false); // Hide the pop-up after saving
+  };
+
+  const confirmSaveDrawing = () => {
+    // const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+    const dataToSave = {
+      // Drawing data
+      lines,                    // All line objects with their intersections
+      
+      // Instrument mapping
+      idInstrumentMap,          // CRITICAL - maps lineId to instrument
+      
+      // UI/Playback state
+      colorInstrumentMap,       // Current color slot -> instrument mapping
+      colorSlots,              // Custom colors for each slot
+      currentScale,            // Musical scale (e.g., 'pentatonicMinor')
+      gridIndex,               // Which grid config (0-5)
+      bpm,                     // Tempo
+      volume,                  // Master volume
+    };
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgRef.current);
+
+    const fileData = {
+      dataset: dataToSave,
+      svg: svgString,
+    };
+
+    const jsonBlob = new Blob([JSON.stringify(fileData)], { type: "application/json" });
+    const url = URL.createObjectURL(jsonBlob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "drawing.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+    // setIsSavePopupVisible(false); // Hide the pop-up
+  };
+
+  // const cancelSaveDrawing = () => {
+  //   setIsSavePopupVisible(false); // Hide the pop-up
+  // };
+
+  const confirmSaveAsJson = () => {
+    // const dataToSave = { lines, sonificationPoints, colorInstrumentMap };
+    const dataToSave = {
+      // Drawing data
+      lines,                    // All line objects with their intersections
+      
+      // Instrument mapping
+      idInstrumentMap,          // CRITICAL - maps lineId to instrument
+      
+      // UI/Playback state
+      colorInstrumentMap,       // Current color slot -> instrument mapping
+      colorSlots,              // Custom colors for each slot
+      currentScale,            // Musical scale (e.g., 'pentatonicMinor')
+      gridIndex,               // Which grid config (0-5)
+      bpm,                     // Tempo
+      volume,                  // Master volume
+    };
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgRef.current);
+
+    const fileData = {
+      dataset: dataToSave,
+      svg: svgString,
+    };
+
+    const jsonBlob = new Blob([JSON.stringify(fileData)], { type: "application/json" });
+    const url = URL.createObjectURL(jsonBlob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "drawing.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+    // setIsSavePopupVisible(false); // Hide the pop-up
+  };
+
+  const confirmSaveAsImage = async () => {
+    const svgElement = svgRef.current;
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgElement);
+
+    // console.log("Serialized SVG String:", svgString);
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const svgSize = svgElement.getBoundingClientRect();
+    const scale = 3;
+    canvas.width = svgSize.width * scale;
+    canvas.height = svgSize.height * scale;
+
+    // Scale the context to match
+    ctx.scale(scale, scale);
+
+    // Draw a white background
+    ctx.fillStyle = '#eae6e1';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Use Canvg to render the SVG onto the canvas
+    const v = await Canvg.fromString(ctx, svgString, {
+      ignoreDimensions: true,
+      ignoreClear: true,
+    });
+
+    // Render the SVG onto the canvas
+    await v.render();
+
+    const imgURL = canvas.toDataURL("image/png");
+
+    const a = document.createElement("a");
+    a.href = imgURL;
+    a.download = "drawing.png";
+    a.click();
+  };
+
+  const confirmSaveAsAudio = async (loops = 0) => {
+    console.log(`Starting audio export with ${loops + 1} iteration(s)...`);
+
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const destination = audioContext.createMediaStreamDestination();
+    const recorder = new MediaRecorder(destination.stream);
+    const chunks = [];
+
+    recorder.ondataavailable = (event) => {
+      chunks.push(event.data);
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sonification.webm';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      console.log("Audio export completed.");
+    };
+
+    recorder.start();
+    console.log("Recorder started.");
+
+    // Play the sonification with the specified number of loops
+    for (let iteration = 0; iteration <= loops; iteration++) {
+      for (let column = firstColumn; column < gridConfigRef.current.numDotsX; column++) {
+        if (intersectedDots.current[column]) {
+          const playPromises = [];
+          
+          // Determine if this is an accent column
+          const isAccentColumn = (column - firstColumn) % gridConfigRef.current.accent === 0;
+          
+          for (const row in intersectedDots.current[column]) {
+            const { color, lineId } = intersectedDots.current[column][row];
+            const instrument = idInstrumentMapRef.current[lineId];
+            const mapRowToNote = getMapRowToNote();
+            const note = mapRowToNote[row];
+
+            playPromises.push(
+              playSound(
+                color,
+                note,
+                1,
+                playbackSpeedRef.current,
+                lineId,
+                { [color]: instrument },
+                isAccentColumn,
+                audioContext,
+                destination
+              )
+            );
+          }
+          await Promise.all(playPromises);
+        }
+
+        await new Promise(resolve =>
+          setTimeout(resolve, playbackSpeedRef.current)
+        );
+      }
+    }
+
+    // Small buffer to ensure the last note finishes before stopping the recorder
+    setTimeout(() => {
+      recorder.stop();
+      console.log("Recorder stopped.");
+    }, 600);
+  };
+
+  const cancelSaveDrawing = () => {
+    setIsSavePopupVisible(false); // Hide the pop-up
+  };
+
+  const handleLoadDrawing = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const jsonData = JSON.parse(event.target.result);
+
+      if (jsonData.dataset) {
+        const loadedData = jsonData.dataset;
+        
+        // Load drawing data
+        const loadedLines = loadedData.lines || [];
+        setLines(loadedLines);
+        
+        // Load instrument mappings
+        const loadedIdInstrumentMap = loadedData.idInstrumentMap || {};
+        setIdInstrumentMap(loadedIdInstrumentMap);
+        
+        const loadedColorInstrumentMap = loadedData.colorInstrumentMap || {
+          color1: 'piano',
+          color2: 'epiano',
+          color3: 'marimba',
+        };
+        setColorInstrumentMap(loadedColorInstrumentMap);
+        
+        // Load UI/Playback state
+        const loadedColorSlots = loadedData.colorSlots || {
+          color1: '#a9103a',
+          color2: '#043293',
+          color3: '#fead36',
+          eraser: '#eae6e0'
+        };
+        setColorSlots(loadedColorSlots);
+        
+        const loadedScale = loadedData.currentScale || 'pentatonicMinor';
+        setCurrentScale(loadedScale);
+        setScale(loadedScale); // Apply to global scale mapping
+        
+        const loadedGridIndex = loadedData.gridIndex !== undefined ? loadedData.gridIndex : 2;
+        setGridIndex(loadedGridIndex);
+        setGridConfig(gridConfigurations[loadedGridIndex]);
+        
+        const loadedBpm = loadedData.bpm || 250;
+        setBpm(loadedBpm);
+        
+        const loadedVolume = loadedData.volume !== undefined ? loadedData.volume : 0.8;
+        setVolume(loadedVolume);
+        setMasterVolume(loadedVolume); // Apply to audio system
+
+        // Rebuild intersectedDots to link sonification points for playback
+        const updatedIntersectedDots = {};
+        loadedLines.forEach((line) => {
+          if (line.intersections) {
+            Object.entries(line.intersections).forEach(([column, rows]) => {
+              if (!updatedIntersectedDots[column]) updatedIntersectedDots[column] = {};
+              Object.entries(rows).forEach(([row, intersectionData]) => {
+                updatedIntersectedDots[column][row] = {
+                  ...intersectionData,
+                  color: line.color,              // Use the line's actual hex color
+                  highlightColor: line.highlightColor || line.color  // Use the line's highlight color
+                };
+              });
+            });
+          }
+        });
+
+        // Update the intersectedDots reference
+        intersectedDots.current = updatedIntersectedDots;
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  // Add a handler for the new button click
+  const handleSettingsButtonClick = () => {
+    setIsSettingsMenuOpen(true); // Open the custom pop-up
+  };
+
+  // Add a handler for closing the custom pop-up
+  const handleCloseSettingsMenu = () => {
+    setIsSettingsMenuOpen(false); // Close the custom pop-up
+  };
+
+  const handleClickOutside = (event) => {
+    // Check if the click is outside the scale menu
+    if (scaleMenuRef.current && !scaleMenuRef.current.contains(event.target)) {
+      setIsScaleMenuOpen(false); // Close the scale menu
+    }
+  };
+
+  const handleClickOutsideColorPalette = (event) => {
+    if (colorPaletteRef.current && !colorPaletteRef.current.contains(event.target)) {
+      closeColorPalette(); // Close the color palette if the click is outside
+    }
+  };
+
+  const handleClickOutsideClearScreen = (event) => {
+    if (clearScreenPopupRef.current && !clearScreenPopupRef.current.contains(event.target)) {
+      setIsClearScreenPopupVisible(false);
+    }
+  };
+
+  const handleClickOutsideSave = (event) => {
+    if (savePopupRef.current && !savePopupRef.current.contains(event.target)) {
+      setIsSavePopupVisible(false);
+    }
+  };
+
+  const handleClearScreen = () => {
+    setIsClearScreenPopupVisible(true);
+  };
+
+  const confirmClearScreen = () => {
+    setLines([]); // Clear all lines
+    setSonificationPoints([]); // Clear all sonification points
+    intersectedDots.current = {}; // Clear intersection data
+    setIsClearScreenPopupVisible(false); // Hide the pop-up
+  };
+
+  const cancelClearScreen = () => {
+    setIsClearScreenPopupVisible(false); // Hide the pop-up
+  };
+
+  const exitEditMode = () => { // exits edit mode and resets all edit state
+    setIsEditMode(false);
+    setSelectedLine(null);
+    setSelectedLineIds([]);
+    setDraggedLineIds([]);
+    setIsDragging(false);
+    setIsSweepSelecting(false);
+    setBoxSelectCurrent(null);
+  }
+
+  useEffect(() => {
+    const loadSounds = async () => {
+      await preloadSounds(); // Preload sounds
+      setIsLoading(false);   // Hide pop-up after loading
+    };
+    loadSounds();
+  }, []);
+
+  useEffect(() => {
+    if (isClearScreenPopupVisible) {
+      document.addEventListener("mousedown", handleClickOutsideClearScreen);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutsideClearScreen);
+    }
+
+    return () => document.removeEventListener("mousedown", handleClickOutsideClearScreen);
+  }, [isClearScreenPopupVisible]);
+
+  useEffect(() => {
+    if (isSavePopupVisible) {
+      document.addEventListener("mousedown", handleClickOutsideSave);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutsideSave);
+    }
+
+    return () => document.removeEventListener("mousedown", handleClickOutsideSave);
+  }, [isSavePopupVisible]);
+
+  useEffect(() => {
+    if (isScaleMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    // Cleanup the event listener on unmount
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isScaleMenuOpen]);
+
+  useEffect(() => {
+    if (activeColorSlot) {
+      document.addEventListener("mousedown", handleClickOutsideColorPalette);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutsideColorPalette);
+    }
+  
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideColorPalette);
+    };
+  }, [activeColorSlot]);
+
+  // const handleClickOutsideInstrument = (event) => {
+  //   if (
+  //     instrumentMenuRef.current &&
+  //     !instrumentMenuRef.current.contains(event.target)
+  //   ) {
+  //     closeInstrumentMenu(); // Close the instrument menu
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   if (selectedColor) {
+  //     document.addEventListener("mousedown", handleClickOutsideInstrument);
+  //   } else {
+  //     document.removeEventListener("mousedown", handleClickOutsideInstrument);
+  //   }
+
+  //   return () =>
+  //     document.removeEventListener("mousedown", handleClickOutsideInstrument);
+  // }, [selectedColor]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+  
+    if (isEditMode) {
+      root.style.setProperty('--canvasColor', '#b7aea2'); // Light gray for Edit Mode
+    } else {
+      root.style.setProperty('--canvasColor', '#ffffff'); // Default canvas color
+    }
+  }, [isEditMode]);
+
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (event.code === 'Space' && playStopButtonRef.current) {
+        event.preventDefault(); // Prevent default scrolling or other space-related actions
+        playStopButtonRef.current.click(); // Simulate button click
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
+
+  useEffect(() => {
+    colorInstrumentMapRef.current = colorInstrumentMap; // Update ref whenever state changes
+  }, [colorInstrumentMap]);
+
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed; // Update ref whenever state changes
+  }, [playbackSpeed]);
+
+  // Update these refs whenever the state changes
+  // useEffect(() => {
+  //   loopRef.current = loop;
+  // }, [loop]);
+
+  useEffect(() => {
+    const preventSelection = (e) => {
+      e.preventDefault();
+    };
+
+    // Add event listeners to prevent selection
+    window.addEventListener('selectstart', preventSelection);
+    window.addEventListener('dragstart', preventSelection);
+
+    // Clean up event listeners on component unmount
+    return () => {
+      window.removeEventListener('selectstart', preventSelection);
+      window.removeEventListener('dragstart', preventSelection);
+    };
+  }, []);
+
+  const handleScaleChange = (selectedScale) => {
+    setCurrentScale(selectedScale); // Update current scale for UI
+    // setCurrentDirection(selectedScale)
+    // console.log('Selected scale:', currentScale);
+    setScale(selectedScale); // Update global scale
+    setIsScaleMenuOpen(false); // Close the menu
+  };
+
+  const openInstrumentMenu = (slot) => {
+    setSelectedSlot(slot); // Set the slot for which the menu should be shown
+  };
+
+  const updateInstrumentForColor = (instrument) => {
+    setColorInstrumentMap((prevMap) => ({
+      ...prevMap,
+      [selectedSlot]: instrument, // Update the instrument for the selected slot
+    }));
+    // Don't close after selection - Renee
+    // closeInstrumentMenu(); // Close the modal after selection
+  };
+
+  const updateColorForSlot = (slot, newColor) => {
+    setColorSlots((prevSlots) => ({
+      ...prevSlots,
+      [slot]: newColor, // Update the color for the selected slot
+    }));
+  };
+
+
+  const closeInstrumentMenu = () => {
+    setSelectedSlot(null); // Clear the selected slot, hiding the modal
+  };
+
+  const toggleGrid = () => {
+    setShowGrid((prevShowGrid) => !prevShowGrid);
+    // console.log('Grid visibility toggled:', !showGrid);
+  };
+
+  useEffect(() => { }, [playbackSpeed]);
+
+  // Helper function to check if two line segments intersect (used for eraser functionality)
+  const doLineSegmentsIntersect = (p0, p1, p2, p3) => {
+    // Validate that all points are defined
+    if (!p0 || !p1 || !p2 || !p3) {
+      return false;
+    }
+
+    const det = (p1[0] - p0[0]) * (p3[1] - p2[1]) - (p1[1] - p0[1]) * (p3[0] - p2[0]);
+    if (det === 0) {
+      return false; // Lines are parallel
+    }
+    const lambda = ((p3[1] - p2[1]) * (p3[0] - p0[0]) + (p2[0] - p3[0]) * (p3[1] - p0[1])) / det;
+    const gamma = ((p0[1] - p1[1]) * (p3[0] - p0[0]) + (p1[0] - p0[0]) * (p3[1] - p0[1])) / det;
+    return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+  };
+
+  // Interpolates points between start and end to generate smooth lines
+  const interpolatePoints = (start, end, numPoints) => {
+    // console.time('Interpolation');
+    const points = [];
+    for (let i = 1; i <= numPoints; i++) {
+      const t = i / (numPoints + 1);
+      const x = start[0] + (end[0] - start[0]) * t;
+      const y = start[1] + (end[1] - start[1]) * t;
+      // const pressure = start[2] + (end[2] - start[2]) * t;
+      // points.push([x, y, pressure]);
+      points.push([x, y]);
+    }
+    // console.timeEnd('Interpolation');
+    return points;
+  };
+
+  const handleResize = () => {
+    const container = document.querySelector('.canvas-container');
+    if (!container) return;
+    
+    const newWidth = container.clientWidth;
+    const newHeight = container.clientHeight;
+
+    // Skip if dimensions haven't actually changed
+    if (newWidth === originalSvgSize.current.width && newHeight === originalSvgSize.current.height) {
+      return;
+    }
+
+    // Calculate scale factors
+    const scaleX = newWidth / originalSvgSize.current.width;
+    const scaleY = newHeight / originalSvgSize.current.height;
+
+    // Update each line's points and recalculate intersections
+    const resizedLines = lines.map((line) => {
+      const scaledPoints = line.points.map(([x, y]) => [x * scaleX, y * scaleY]);
+      
+      // Create a new line object with scaled points
+      const scaledLine = {
+        ...line,
+        points: scaledPoints,
+        intersections: {}, // Reset intersections, will be recalculated
+      };
+      
+      return scaledLine;
+    });
+
+    // Recalculate all intersections with the grid
+    const updatedIntersectedDots = {};
+    const spatialHash = createSpatialHash(gridConfigRef.current);
+
+    resizedLines.forEach((line) => {
+      calculateIntersections(line, gridConfigRef.current, updatedIntersectedDots, spatialHash);
+    });
+
+    // Update lines and intersections
+    setLines(resizedLines);
+    intersectedDots.current = updatedIntersectedDots;
+    setIntersectedDotsState({ ...updatedIntersectedDots });
+
+    // Update the original size reference
+    originalSvgSize.current = { width: newWidth, height: newHeight };
+  };
+
+  useEffect(() => {
+    const resizeListener = () => {
+      handleResize();
+      // When rotating into landscape phone mode, the body may have a scroll offset
+      // from portrait scrolling. That offset makes iOS touch coordinates wrong for
+      // fixed-position buttons. Reset it immediately.
+      // iOS doesn't flush touch hit-targets on CSS media query changes — only on
+      // explicit JS style mutations. Setting bar.style.height = '100vh' (same value
+      // as the CSS rule) forces the flush without changing the visual result.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const w = window.innerWidth, h = window.innerHeight;
+        const isLandscapePhone = w > h && w / h >= 1.6 && h <= 500;
+        const bar = document.querySelector('.phone-bottom-bar');
+        // Always reset scroll on rotation — landscape→portrait can restore a stale
+        // scroll offset from before body was fixed, which offsets drawing coordinates.
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        if (isLandscapePhone) {
+          if (bar) bar.style.height = '100vh';
+        } else {
+          if (bar) bar.style.height = '';
+        }
+      }));
+    };
+    const fixBarOnRotation = () => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const w = window.innerWidth, h = window.innerHeight;
+        const isLandscapePhone = w > h && w / h >= 1.6 && h <= 500;
+        const bar = document.querySelector('.phone-bottom-bar');
+        window.scrollTo(0, 0);
+        if (isLandscapePhone) {
+          if (bar) bar.style.height = '100vh';
+        } else {
+          if (bar) bar.style.height = '';
+        }
+      }));
+    };
+
+    window.addEventListener('resize', resizeListener);
+    window.addEventListener('orientationchange', fixBarOnRotation);
+
+    return () => {
+      window.removeEventListener('resize', resizeListener);
+      window.removeEventListener('orientationchange', fixBarOnRotation);
+    };
+  }, [lines, gridConfig]);
+
+  // Handles the slider input for changing playback speed
+  const handleSliderChange = (e) => {
+    const value = Number(e.target.value);
+
+    const playbackSpeedValue = 50 + value; // Adjusting the base to 200 ms
+    setPlaybackSpeed(playbackSpeedValue); // Ensure playbackSpeed is updated correctly
+
+    // console.log("Current playback speed:", playbackSpeedValue);
+  };
+
+  const getClosestPointOnSegment = (point, start, end) => {
+    const [px, py] = point;
+    const [x1, y1] = start;
+    const [x2, y2] = end;
+  
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+  
+    if (dx === 0 && dy === 0) {
+      // The segment is a single point
+      return [x1, y1];
+    }
+  
+    // Calculate the projection of the point onto the line segment
+    const t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+  
+    if (t < 0) {
+      // Closest point is the start of the segment
+      return [x1, y1];
+    } else if (t > 1) {
+      // Closest point is the end of the segment
+      return [x2, y2];
+    } else {
+      // Closest point is somewhere in the middle of the segment
+      return [x1 + t * dx, y1 + t * dy];
+    }
+  };
+
+  const getLineAtPoint = (clickPoint) => {
+    return [...lines].reverse().find((line) =>
+      !line.isEraser &&
+      line.points.some((startPoint, index) => {
+        if (index === line.points.length - 1) return false;
+        const endPoint = line.points[index + 1];
+        return isPointNearLineSegment(
+          clickPoint,
+          startPoint,
+          endPoint,
+          line.size
+        );
+      })
+    );
+  };
+
+  const lineTouchesSweepPath = (line, pathPoints) => {
+    if (!pathPoints || pathPoints.length < 2) return false;
+
+    for (let i = 0; i < pathPoints.length - 1; i++) {
+      const sweepStart = pathPoints[i];
+      const sweepEnd = pathPoints[i + 1];
+
+      for (let j = 0; j < line.points.length - 1; j++) {
+        const start = line.points[j];
+        const end = line.points[j + 1];
+
+        if (isPointNearLineSegment(sweepStart, start, end, line.size + 12) ||
+          isPointNearLineSegment(sweepEnd, start, end, line.size + 12)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  const lineIntersectsBox = (line, x1, y1, x2, y2) => {
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    return line.points.some(([px, py]) => px >= minX && px <= maxX && py >= minY && py <= maxY);
+  };
+
+  const rebuildDraggedLineIntersections = (updatedLines, movedLineIds) => {
+    const updatedIntersectedDots = { ...intersectedDots.current };
+
+    for (const column in updatedIntersectedDots) {
+      for (const row in updatedIntersectedDots[column]) {
+        if (movedLineIds.includes(updatedIntersectedDots[column][row].lineId)) {
+          delete updatedIntersectedDots[column][row];
+        }
+      }
+    }
+
+    const spatialHash = createSpatialHash(gridConfig);
+    movedLineIds.forEach((lineId) => {
+      const movedLine = updatedLines.find((line) => line.lineId === lineId);
+      if (movedLine) {
+        calculateIntersections(movedLine, gridConfig, updatedIntersectedDots, spatialHash);
+      }
+    });
+
+    intersectedDots.current = updatedIntersectedDots;
+    setIntersectedDotsState({ ...updatedIntersectedDots });
+  };
+
+  // Called when user starts drawing (pointer down)
+  const handlePointerDown = (e) => {
+    setWasDragged(false); didActuallyDragRef.current = false; // Reset the dragging flag
+    e.target.setPointerCapture(e.pointerId);
+    // const clickPoint = [e.pageX, e.pageY];
+    const canvasRect = svgRef.current.getBoundingClientRect();
+    // const clickPoint = [e.clientX - canvasRect.left, e.clientY - canvasRect.top];
+    // const clickPoint = [e.pageX, e.pageY];
+
+    const container = document.querySelector('.canvas-container');
+    const containerRect = container.getBoundingClientRect();
+    const clickPoint = [e.clientX - containerRect.left, e.clientY - containerRect.top];
+
+    clickPointRef.current = clickPoint; // Store the clickPoint in the ref
+
+    if (isEditMode) {
+      const clickedLine = getLineAtPoint(clickPoint);
+
+    if (clickedLine) {
+
+      let idsToDrag;
+
+      if(selectedLineIds.includes(clickedLine.lineId)) {
+        // drag the existing group
+        idsToDrag = selectedLineIds;
+      } else {
+        // clicked a new stroke - clear previous selection
+        setSelectedLineIds([]);
+        idsToDrag = [clickedLine.lineId];
+      }
+
+      setDraggedLine(clickedLine);
+      setDraggedLineIds(idsToDrag);
+
+        pendingDragSnapshot.current = { lines, sonificationPoints, idInstrumentMap };
+        setIsDragging(true);
+        setInitialDragPoint(clickPoint);
+        setWasDragged(false); didActuallyDragRef.current = false;
+
+        originalDraggedLinesPointsRef.current = {};
+        idsToDrag.forEach((lineId) => {
+          const line = lines.find((l) => l.lineId === lineId);
+          if (line) {
+            originalDraggedLinesPointsRef.current[lineId] =
+              line.points.map(([x, y]) => [x, y]);
+          }
+        });
+      } else {
+        // empty space in edit mode:
+        // start sweep selection and clear old selection
+        setSelectedLine(null);
+        setDraggedLine(null);
+        setDraggedLineIds([]);
+        setSelectedLineIds([]);
+        setIsSweepSelecting(true);
+        setBoxSelectCurrent(null);
+        setWasDragged(false); didActuallyDragRef.current = false;
+      }
+
+      return;
+    }
+
+    // if (isEditMode) {
+    //   // const clickedLine = lines.find((line) =>
+    //   const clickedLine = [...lines].reverse().find((line) =>
+    //     !line.isEraser && // Ignore eraser lines
+    //     line.points.some((startPoint, index) => {
+    //       if (index === line.points.length - 1) return false; // Skip the last point
+    //       const endPoint = line.points[index + 1];
+    //       return isPointNearLineSegment(
+    //         clickPoint,
+    //         startPoint,
+    //         endPoint,
+    //         line.size // Include the stroke width in the calculation
+    //       );
+    //     })
+    //   );
+  
+    //   if (clickedLine) {
+    //     // Find the closest point on the line to the click point
+    //     let closestPoint = null;
+    //     let minDistance = Infinity;
+  
+    //     clickedLine.points.forEach((startPoint, index) => {
+    //       if (index === clickedLine.points.length - 1) return; // Skip the last point
+    //       const endPoint = clickedLine.points[index + 1];
+    //       const pointOnSegment = getClosestPointOnSegment(clickPoint, startPoint, endPoint);
+    //       const distance = Math.hypot(pointOnSegment[0] - clickPoint[0], pointOnSegment[1] - clickPoint[1]);
+  
+    //       if (distance < minDistance) {
+    //         minDistance = distance;
+    //         closestPoint = pointOnSegment;
+    //       }
+    //     });
+  
+    //     setDraggedLine(clickedLine); // Set the clicked line as the dragged line
+    //     setOriginalLinePoints(clickedLine.points); // Store the original points of the line
+    //     setIsDragging(true); // Enable dragging
+    //     setDragOffset([clickPoint[0] - closestPoint[0], clickPoint[1] - closestPoint[1]]); // Calculate the offset
+    //     setInitialDragPoint(clickPoint); // Store the initial cursor position
+    //   }
+    // }
+
+    if (isEditMode) {
+      return; // Block drawing when Edit Mode is active
+    }
+
+    if (isTrash) {
+      const clickedLine = getLineAtPoint(clickPoint);
+
+      if (clickedLine) {
+        // Single-click delete: remove the tapped stroke immediately
+        const snapshot = { lines, sonificationPoints, idInstrumentMap };
+        for (const column in intersectedDots.current) {
+          for (const row in intersectedDots.current[column]) {
+            if (intersectedDots.current[column][row].lineId === clickedLine.lineId) {
+              delete intersectedDots.current[column][row];
+            }
+          }
+        }
+        stopSoundsForLine(clickedLine.lineId);
+        const updatedLines = lines.filter((l) => l.lineId !== clickedLine.lineId);
+        const remainingSonificationPoints = updatedLines.flatMap((l) => l.sonificationPoints);
+        setUndoStack((prev) => [...prev, snapshot]);
+        setLines(updatedLines);
+        setSonificationPoints(remainingSonificationPoints);
+        setRedoStack([]);
+      } else {
+        // No stroke under finger — start sweep erase
+        isSweepErasingRef.current = true;
+        sweepEraseSnapshotRef.current = { lines, sonificationPoints, idInstrumentMap };
+        sweepErasedRef.current = false;
+        lastErasePointRef.current = clickPoint;
+      }
+      return;
+    } else {
+      // Regular drawing mode
+      setCurrentLine([clickPoint]);
+      setSonificationPoints([clickPoint]); // Initialize sound-triggering points
+    }
+  };
+
+  const handlePointerMove = (e) => {
+
+    if (isEditMode) {
+      // const canvasRect = svgRef.current.getBoundingClientRect();
+      // const currentPoint = [e.clientX - canvasRect.left, e.clientY - canvasRect.top];
+      const container = document.querySelector('.canvas-container');
+      const containerRect = container.getBoundingClientRect();
+      const currentPoint = [e.clientX - containerRect.left, e.clientY - containerRect.top];
+
+      if (isDragging && draggedLineIds.length > 0 && initialDragPoint) {
+        const offsetX = currentPoint[0] - initialDragPoint[0];
+        const offsetY = currentPoint[1] - initialDragPoint[1];
+
+        // Require at least 6px of movement before treating as a drag
+        if (Math.hypot(offsetX, offsetY) <= 6) return;
+
+        if (!didActuallyDragRef.current) {
+          setWasDragged(true); 
+          didActuallyDragRef.current = true;
+        }
+
+        const updatedLines = lines.map((line) => {
+          if (!draggedLineIds.includes(line.lineId)) return line;
+
+          const originalPoints = originalDraggedLinesPointsRef.current[line.lineId];
+          return {
+            ...line,
+            points: originalPoints.map(([x, y]) => [x + offsetX, y + offsetY]),
+          };
+        });
+
+        setLines(updatedLines);
+        rebuildDraggedLineIntersections(updatedLines, draggedLineIds);
+        return;
+      }
+
+      if (isSweepSelecting) {
+        setWasDragged(true); didActuallyDragRef.current = true;
+
+        setBoxSelectCurrent(currentPoint);
+
+        const startPoint = clickPointRef.current;
+        if (startPoint) {
+          const [x1, y1] = startPoint;
+          const [x2, y2] = currentPoint;
+          const newSelectedIds = lines
+            .filter((line) => !line.isEraser && lineIntersectsBox(line, x1, y1, x2, y2))
+            .map((line) => line.lineId);
+          setSelectedLineIds(newSelectedIds);
+        }
+
+        return;
+      }
+
+      return;
+    }
+
+    // // Handle line dragging in Edit Mode
+    // if (isDragging && draggedLine && originalLinePoints && initialDragPoint) {
+    //   wasDraggedRef.current.current = true; // Mark as dragged
+    //   const canvasRect = svgRef.current.getBoundingClientRect();
+    //   const currentPoint = [e.clientX - canvasRect.left, e.clientY - canvasRect.top];
+
+    //   // Calculate the offset relative to the initial drag point
+    //   const offsetX = currentPoint[0] - initialDragPoint[0];
+    //   const offsetY = currentPoint[1] - initialDragPoint[1];
+
+    //   // Update the position of the dragged line
+    //   const updatedLines = lines.map((line) =>
+    //     line.lineId === draggedLine.lineId
+    //       ? {
+    //           ...line,
+    //           points: originalLinePoints.map(([x, y]) => [x + offsetX, y + offsetY]),
+    //         }
+    //       : line
+    //   );
+
+    //   setLines(updatedLines);
+
+    //   // Recalculate intersections for the dragged line
+    //   const updatedIntersectedDots = { ...intersectedDots.current };
+
+    //   // Clear old intersections for the dragged line
+    //   for (const column in updatedIntersectedDots) {
+    //     for (const row in updatedIntersectedDots[column]) {
+    //       if (updatedIntersectedDots[column][row].lineId === draggedLine.lineId) {
+    //         delete updatedIntersectedDots[column][row];
+    //       }
+    //     }
+    //   }
+
+    //   // Recalculate intersections for the new position of the dragged line
+    //   const spatialHash = createSpatialHash(gridConfig);
+    //   const updatedDraggedLine = updatedLines.find((line) => line.lineId === draggedLine.lineId);
+    //   calculateIntersections(updatedDraggedLine, gridConfig, updatedIntersectedDots, spatialHash);
+
+    //   // Update the intersectedDots reference and trigger a re-render
+    //   intersectedDots.current = updatedIntersectedDots;
+    //   // setIntersectedDotsState({ ...updatedIntersectedDots });
+
+    //   return; // Exit early to avoid processing other modes
+    // }
+
+    if (isEditMode) {
+      return; // Block all drawing-related logic when Edit Mode is active
+    }
+
+    if (e.buttons !== 1) return; // Only draw when mouse button is held down
+    const container = document.querySelector('.canvas-container');
+    const containerRect = container.getBoundingClientRect();
+    const newPoint = [e.clientX - containerRect.left, e.clientY - containerRect.top, e.pressure];
+
+    if (isTrash && isSweepErasingRef.current) {
+      const lastPoint = lastErasePointRef.current;
+      lastErasePointRef.current = newPoint;
+      const segment = [lastPoint, newPoint];
+      const toDelete = lines.filter((line) => lineTouchesSweepPath(line, segment));
+      if (toDelete.length > 0) {
+        sweepErasedRef.current = true;
+        const toDeleteIds = new Set(toDelete.map((l) => l.lineId));
+        toDeleteIds.forEach((lineId) => {
+          for (const column in intersectedDots.current) {
+            for (const row in intersectedDots.current[column]) {
+              if (intersectedDots.current[column][row].lineId === lineId) {
+                delete intersectedDots.current[column][row];
+              }
+            }
+          }
+          stopSoundsForLine(lineId);
+        });
+        const updatedLines = lines.filter((l) => !toDeleteIds.has(l.lineId));
+        setLines(updatedLines);
+        setSonificationPoints(updatedLines.flatMap((l) => l.sonificationPoints));
+        setRedoStack([]);
+      }
+      return;
+    } else if (isTrash) {
+      // single-click delete already handled in pointer-down
+      return;
+    } else {
+      // Regular drawing mode
+      setCurrentLine((prevLine) => [...prevLine, newPoint]);
+      setSonificationPoints((prevPoints) => {
+        // Interpolate points for smoother sonification
+        const lastPoint = prevPoints.length > 0 ? prevPoints[prevPoints.length - 1] : newPoint;
+        const distance = Math.hypot(newPoint[0] - lastPoint[0], newPoint[1] - lastPoint[1]);
+        const numInterpolatedPoints = Math.floor(distance / pointInterpolationDivisor); // Adjust this value for more/less interpolation
+        const interpolatedPoints = interpolatePoints(lastPoint, newPoint, numInterpolatedPoints);
+        return [...prevPoints, ...interpolatedPoints, newPoint];
+      });
+    }
+  };
+
+  const handlePointerUp = () => {
+
+    if (isEditMode) {
+      const clickPoint = clickPointRef.current;
+      const clickedLine = clickPoint ? getLineAtPoint(clickPoint) : null;
+
+      if (isSweepSelecting) {
+        setIsSweepSelecting(false);
+        setBoxSelectCurrent(null);
+
+        // click on empty space without dragging = unselect all
+        if (!wasDragged) {
+          setSelectedLineIds([]);
+          setSelectedLine(null);
+        }
+        return;
+      }
+
+      if (isDragging) {
+        const snapshot = pendingDragSnapshot.current;
+        pendingDragSnapshot.current = null;
+        if (didActuallyDragRef.current && snapshot) {
+          setUndoStack(prev => [...prev, snapshot]);
+          setRedoStack([]);
+        }
+        setIsDragging(false);
+        setDraggedLine(null);
+        setDraggedLineIds([]);
+        originalDraggedLinesPointsRef.current = {};
+
+        // If the pointer didn't move, treat it as a click
+        if (!wasDragged && clickedLine) {
+          if (selectedLineIds.includes(clickedLine.lineId) && selectedLineIds.length > 1) {
+            // Part of a multiselect — open modal for the group, keep selection
+            setSelectedLine(clickedLine);
+          } else {
+            setSelectedLineIds([]);
+            setSelectedLine(clickedLine);
+          }
+        }
+
+        return;
+      }
+
+      if(!wasDragged) {
+        if(clickedLine) {
+          if(selectedLineIds.includes(clickedLine.lineId) && selectedLineIds.length > 1) {
+            // Part of a multiselect — open modal for the group, keep selection
+            setSelectedLine(clickedLine);
+          } else {
+            setSelectedLineIds([]);
+            setSelectedLine(clickedLine);
+          }
+        } else {
+          setSelectedLineIds([]);
+          setSelectedLine(null);
+        }
+      }
+
+      return;
+    }
+    // if (!wasDraggedRef.current && isEditMode) {
+
+    //   // Use the clickPoint stored in the ref
+    //   const clickPoint = clickPointRef.current;
+
+    //   if (!clickPoint) return; // Ensure clickPoint is defined
+
+    //   // Check if the click intersects with any line
+    //   // const clickedLine = lines.find((line) =>
+    //   const clickedLine = [...lines].reverse().find((line) =>
+    //     !line.isEraser && // Ignore eraser lines
+    //     line.points.some((startPoint, index) => {
+    //       if (index === line.points.length - 1) return false; // Skip the last point
+    //       const endPoint = line.points[index + 1];
+    //       return isPointNearLineSegment(
+    //         clickPoint,
+    //         startPoint,
+    //         endPoint,
+    //         line.size // Include the stroke width in the calculation
+    //       );
+    //     })
+    //   );
+  
+    //   // if (clickedLine) {
+    //   //   setSelectedLine(clickedLine); // Set the clicked line as the selected line
+    //   // }
+
+    //   // Changed - Renee - for double clicking
+    //   if(clickedLine) {
+    //     const now = Date.now();
+    //     const timeSinceLastClick = now - lastClickTimeRef.current;
+
+    //     if(timeSinceLastClick < DOUBLE_CLICK_DELAY) {
+    //       setSelectedLine(clickedLine);
+    //     }
+
+    //     lastClickTimeRef.current = now;
+    //   }
+    // }
+
+    // if (isDragging && draggedLine) {
+    //   setIntersectedDotsState({ ...intersectedDots.current });
+    //   // Reset dragging state
+    //   setIsDragging(false);
+    //   setDraggedLine(null);
+    //   setOriginalLinePoints(null); // Clear the original points
+    // }
+
+    if (isTrash) {
+      if (isSweepErasingRef.current) {
+        isSweepErasingRef.current = false;
+        if (sweepErasedRef.current && sweepEraseSnapshotRef.current) {
+          const snapshot = sweepEraseSnapshotRef.current;
+          sweepEraseSnapshotRef.current = null;
+          sweepErasedRef.current = false;
+          lastErasePointRef.current = null;
+          setUndoStack((prev) => [...prev, snapshot]);
+        } else {
+          sweepEraseSnapshotRef.current = null;
+          lastErasePointRef.current = null;
+        }
+      }
+      return;
+    } else {
+      // Regular drawing mode
+      const lineId = uuidv4(); // Generate a unique ID for this new line
+      const highlightColor = colorSlots[currentColor];
+
+      const newLine = {
+        points: currentLine,
+        color: colorSlots[currentColor],
+        highlightColor: highlightColor,
+        instrument: colorInstrumentMap[currentColor],
+        size: currentSize,
+        sonificationPoints: [],
+        lineId, // Assign the unique ID to the line
+        intersections: {}, // Initialize an object to store intersections
+      };
+
+      // Update idInstrumentMap with the new line's instrument
+      setIdInstrumentMap((prevMap) => ({
+        ...prevMap,
+        [lineId]: colorInstrumentMap[currentColor],
+      }));
+
+      // Add intersections to both intersectedDots and newLine.intersections
+      sonificationPoints.forEach((point) => {
+        // sonificationPoints.forEach((point, pointIndex) => {
+        for (let i = 0; i < numDotsX; i++) {
+          for (let j = 0; j < numDotsY; j++) {
+
+            const dotX = (canvasDimensions.width / gridConfig.numDotsX) * i + canvasDimensions.width / gridConfig.numDotsX / 2;
+            const dotY = (canvasDimensions.height / gridConfig.numDotsY) * j + canvasDimensions.height / gridConfig.numDotsY / 2;
+
+            // if (isPointNearDot(point[0], point[1], dotX, dotY, dotRadius, currentSize)) {
+            if (isPointNearDot(point[0], point[1], dotX, dotY, gridConfig.dotRadius, currentSize)) {
+              if (!intersectedDots.current[i]) intersectedDots.current[i] = {};
+              if (!newLine.intersections[i]) newLine.intersections[i] = {};
+
+              intersectedDots.current[i][j] = { point, color: currentColor, size: currentSize, lineId };
+              newLine.intersections[i][j] = { point, color: currentColor, size: currentSize, lineId };
+            }
+          }
+        }
+      });
+
+      const updatedIntersectedDots = { ...intersectedDots.current };
+
+      const spatialHash = createSpatialHash(gridConfig);
+      calculateIntersections(newLine, gridConfig, updatedIntersectedDots, spatialHash);
+
+      // Update the intersectedDots reference and trigger a re-render
+      // intersectedDots.current = updatedIntersectedDots;
+      setIntersectedDotsState({ ...updatedIntersectedDots });
+
+      // Save the new line and reset the current state
+      setUndoStack([...undoStack, { lines, sonificationPoints, idInstrumentMap }]);
+      setLines((prevLines) => [...prevLines, newLine]);
+      intersectedDots.current = updatedIntersectedDots; // IF NOT COMMENTED, THIS LINE WILL CAUSE THE LOTS OF INTERSECTIONS TO BE LOST // IF NOT COMMENTED, THIS LINE WILL CAUSE THE LOTS OF INTERSECTIONS TO BE LOST// IF NOT COMMENTED, THIS LINE WILL CAUSE THE LOTS OF INTERSECTIONS TO BE LOST// IF NOT COMMENTED, THIS LINE WILL CAUSE THE LOTS OF INTERSECTIONS TO BE LOST
+      setRedoStack([]);
+      setCurrentLine([]);
+      setSonificationPoints([]);
+    }
+  };
+
+  const handlePlay = async () => {
+    // console.time('Sonification');
+    if (isPlaying) return;
+
+    await resumeAudioContext(); // iOS Safari requires AudioContext to be resumed inside a user gesture
+    setIsPlaying(true);
+    playbackStopped.current = false;
+
+    let column = currentColumn; // Start from the current column
+
+    while (!playbackStopped.current) {
+      if (column >= gridConfigRef.current.numDotsX) {
+        // If the column exceeds the maximum, reset to the first column
+        column = 0;
+
+        // Stop playback if looping is disabled
+        // if (!loopRef.current) break;
+      }
+
+      setCurrentColumn(column); // Update the scanned column
+      setScannedColumn(column);
+
+      // Determine if the current column is a multiple of the accent
+      const isAccentColumn = (column - firstColumn) % gridConfigRef.current.accent === 0;
+
+      // Check the latest colorInstrumentMap and play sounds accordingly
+      if (intersectedDots.current[column]) {
+        const playPromises = [];
+        for (const row in intersectedDots.current[column]) {
+          const { color, lineId } = intersectedDots.current[column][row];
+          // const { lineId } = intersectedDots.current[column][row];
+          // const instrument = idInstrumentMap[lineId]; // Get the instrument from idInstrumentMap
+          const instrument = idInstrumentMapRef.current[lineId]; // Use the ref to get the instrument
+          // console.log("Instrument for lineId:", lineId, "is", instrument);
+          const mapRowToNote = getMapRowToNote();
+          const note = mapRowToNote[row];
+      
+          playPromises.push(
+            playSound(
+              color,
+              note,
+              1,
+              playbackSpeedRef.current,
+              lineId,
+              { [color]: instrument }, // Pass the instrument for this line
+              isAccentColumn
+            )
+          );
+        }
+        await Promise.all(playPromises);
+      }
+
+      // Dynamically adjust tempo using `playbackSpeedRef.current`
+      await new Promise(resolve =>
+        setTimeout(resolve, playbackSpeedRef.current)
+      );
+
+      column++; // Move to the next column
+    }
+
+    // Reset playback state after finishing
+    setCurrentColumn(-1);
+    setScannedColumn(-1);
+    setIsPlaying(false);
+    // console.timeEnd('Sonification');
+  };
+
+  const updateLineColor = (line, newColor) => {
+    const activeIds = selectedLineIdsRef.current;
+    const idsToUpdate = (activeIds.length > 1 && activeIds.includes(line.lineId))
+      ? activeIds
+      : [line.lineId];
+    setUndoStack(prev => [...prev, { lines, sonificationPoints, idInstrumentMap }]);
+    setRedoStack([]);
+    setLines((prevLines) =>
+      prevLines.map((l) =>
+        idsToUpdate.includes(l.lineId) ? { ...l, color: newColor, highlightColor: newColor } : l
+      )
+    );
+
+    for (const column in intersectedDots.current) {
+      for (const row in intersectedDotsState[column]) {
+        if (idsToUpdate.includes(intersectedDotsState[column][row].lineId)) {
+          intersectedDotsState[column][row].color = newColor;
+        }
+      }
+    }
+
+    setSelectedLine(null); // Close the modal after updating
+  };
+
+  const updateLineInstrument = (line, newInstrument) => {
+    const activeIds = selectedLineIdsRef.current;
+    const idsToUpdate = (activeIds.length > 1 && activeIds.includes(line.lineId))
+      ? activeIds
+      : [line.lineId];
+    setUndoStack(prev => [...prev, { lines, sonificationPoints, idInstrumentMap }]);
+    setRedoStack([]);
+    setLines((prevLines) =>
+      prevLines.map((l) =>
+        idsToUpdate.includes(l.lineId) ? { ...l, instrument: newInstrument } : l
+      )
+    );
+
+    // Update the instrument map for all affected lines
+    setIdInstrumentMap((prevMap) => {
+      const updates = {};
+      idsToUpdate.forEach((id) => { updates[id] = newInstrument; });
+      return { ...prevMap, ...updates };
+    });
+
+    setSelectedLine(null); // Close the modal after updating
+  };
+
+  const rebuildIntersectionsFromLines = (targetLines) => {
+    const newIntersectedDots = {};
+    const spatialHash = createSpatialHash(gridConfig);
+    targetLines.forEach(line => {
+      if (!line.isEraser) {
+        calculateIntersections(line, gridConfig, newIntersectedDots, spatialHash);
+      }
+    });
+    intersectedDots.current = newIntersectedDots;
+  };
+
+  // Undo and redo logic for managing drawing history
+  const handleUndo = () => {
+    if (undoStack.length > 0) {
+      const previousState = undoStack[undoStack.length - 1];
+      setUndoStack(undoStack.slice(0, -1));
+      setRedoStack([{ lines, sonificationPoints, idInstrumentMap }, ...redoStack]);
+      setLines(previousState.lines);
+      setSonificationPoints(previousState.sonificationPoints);
+      if (previousState.idInstrumentMap) {
+        setIdInstrumentMap(previousState.idInstrumentMap);
+        idInstrumentMapRef.current = previousState.idInstrumentMap;
+      }
+      rebuildIntersectionsFromLines(previousState.lines);
+    }
+  };
+
+  // Updated redo functionality with intersection handling
+  const handleRedo = () => {
+    if (redoStack.length > 0) {
+      const nextState = redoStack[0];
+      setRedoStack(redoStack.slice(1));
+      setUndoStack([...undoStack, { lines, sonificationPoints, idInstrumentMap }]);
+      setLines(nextState.lines);
+      setSonificationPoints(nextState.sonificationPoints);
+      if (nextState.idInstrumentMap) {
+        setIdInstrumentMap(nextState.idInstrumentMap);
+        idInstrumentMapRef.current = nextState.idInstrumentMap;
+      }
+      rebuildIntersectionsFromLines(nextState.lines);
+    }
+  };
+
+  const ClearScreenPopup = ({ onConfirm, onCancel }) => (
+    <div className="popup-overlay">
+      <div className="popup-content" ref={clearScreenPopupRef}>
+        <h2>Warning</h2>
+        <p>Are you sure you want to clean the screen? The drawing cannot be recovered.</p>
+        <div className="popup-buttons">
+          <button onClick={onConfirm}>Yes</button>
+          <button onClick={onCancel}>No</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const SavePopup = ({ onSave, onCancel }) => {
+    const [saveJson, setSaveJson] = useState(true);
+    const [saveImage, setSaveImage] = useState(true);
+    const [saveAudio, setSaveAudio] = useState(true);
+
+    const audioLoops = gridConfig.numDotsX >= 48 ? 0 : 3;
+
+    const handleSave = () => {
+      onSave({ saveJson, saveImage, saveAudio, audioLoops });
+    };
+
+    return (
+      <div className="popup-overlay">
+        <div className="popup-content" ref={savePopupRef}>
+          <h2>Save Drawing</h2>
+          <p>Select the formats you want to save:</p>
+          <div className="popup-checkboxes">
+            <label>
+              <input
+                type="checkbox"
+                checked={saveJson}
+                onChange={(e) => setSaveJson(e.target.checked)}
+              />
+              Save Project
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={saveImage}
+                onChange={(e) => setSaveImage(e.target.checked)}
+              />
+              Save Image
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={saveAudio}
+                onChange={(e) => setSaveAudio(e.target.checked)}
+              />
+              Save Audio
+            </label>
+          </div>
+          <div className="popup-buttons">
+            <button onClick={handleSave}>Download</button>
+            <button onClick={onCancel}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const allStrokes = lines.map((line, index) => {
+    const strokeOptions = { ...options, size: line.size };
+
+    // Added - Renee
+    const pathData = getSvgPathFromStroke(getStroke(line.points, strokeOptions));
+
+    const isHighlighted =
+      isEditMode && (selectedLineIds.includes(line.lineId) ||
+        draggedLineIds.includes(line.lineId) ||
+        (selectedLine && selectedLine.lineId === line.lineId)
+      );
+
+    // changed - Renee
+    return (
+      <g key={index}>
+        {isHighlighted && (
+          <path
+            d={pathData}
+            fill="none"
+            stroke={line.highlightColor}
+            strokeWidth={12}
+            opacity="0.5"
+          />
+        )}
+
+        <path
+          d={pathData}
+          fill={line.color}
+        />
+      </g>
+    );
+  });
+
+  // Generates the stroke for the current line being drawn
+  const currentStroke = getSvgPathFromStroke(getStroke(currentLine, { ...options, size: currentSize }));
+  <path d={currentStroke} fill={colorSlots[currentColor]} /> // Update here
+
+  return (
+    <div className="main-container">
+      <div className={`controls-container ${selectedSlot ? 'menu-active' : ''}`}>
+        <div className="controls-scaler">
+        <div className="play-group">
+          <button
+            ref={playStopButtonRef} // Add a ref here
+            className={`play-stop-button ${isPlaying ? 'stop-mode' : 'play-mode'}`}
+            onClick={() => {
+              if (isPlaying) {
+                playbackStopped.current = true;
+              } else {
+                handlePlay();
+              }
+            }}
+          >
+            <img
+              src={isPlaying ? StopIcon : PlayIcon}
+              alt={isPlaying ? "Stop" : "Play"}
+              className={`icon ${isPlaying ? "iconStop" : "iconPlay"}`}
+            />
+          </button>
+        </div>
+
+        <div className="color-group">
+          {Object.keys(colorInstrumentMap).map((slot, index) => (
+            <div key={index} className={`color-instrument-pair ${selectedSlot === slot ? 'menu-open' : ''}`}>
+              {/* Color button */}
+              <button
+                className={`color-button ${!isEditMode && currentColor === slot ? 'active' : ''}`}
+                // style={{ backgroundColor: colorSlots[slot], position: 'relative' }} // Add relative positioning
+                // style={{ backgroundColor: colorSlots[slot], borderColor: colorSlots[slot] }}
+                style={{ borderColor: colorSlots[slot], border: `12px solid ${colorSlots[slot]}` }}
+                onMouseDown={() => handleMouseDown(slot)} // Detect long press
+                onMouseUp={handleMouseUp} // Clear timer on release
+                onMouseLeave={handleMouseUp} // Clear timer if the mouse leaves the button
+                onClick={() => {
+                  exitEditMode() // leave edit
+                  setCurrentColor(slot); // Set the selected slot
+                  setIsEraser(false);    // Deactivate eraser
+                  setIsTrash(false);     // Deactivate trash
+                }}
+              >
+                {/* Instrument icon overlay */}
+                <img
+                  src={instrumentIcons[colorInstrumentMap[slot]]}
+                  alt={colorInstrumentMap[slot]}
+                  className="color-button-instrument-icon"
+                />
+              </button>
+              {/* Gear tab: white connector + gear button share one background */}
+              <div className="gear-tab-wrapper">
+                <div className="instrument-connector" />
+                <button
+                  className="instrument-select-button"
+                  onClick={() => { // added - Renee
+                    if(isEditMode) exitEditMode();
+                    openInstrumentMenu(slot);
+                  }}
+                >
+                  <img src={GearIcon} alt="Settings Button" className="iconGear" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+{/* 
+        <div className="edit-container">
+          <button
+            className={`edit-button ${isEditMode ? 'active' : ''}`}
+            onClick={() => setIsEditMode(!isEditMode)}
+          >
+            <img src={EditIcon} alt="Edit" className="iconEdit" />
+          </button>
+        </div> */}
+
+
+        {/* Sliders: brush → volume → metronome → grid */}
+        <div className="vertical-sliders-1">
+          <div className="brush-size-group">
+            <input
+              type="range"
+              min="1"
+              max="50"
+              step="1"
+              value={currentSize}
+              onChange={(e) => setCurrentSize(Number(e.target.value))}
+            />
+          </div>
+          <div className="volume-slider-group">
+            <input
+              id="volume-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={(e) => {
+                const newVolume = parseFloat(e.target.value);
+                setVolume(newVolume);
+                setMasterVolume(newVolume);
+              }}
+            />
+          </div>
+          <div className="slider-group">
+            <input
+              id="bpm"
+              type="range"
+              min="60"
+              max="400"
+              step="5"
+              value={bpm}
+              onChange={(e) => {
+                const bpmValue = Number(e.target.value);
+                setBpm(bpmValue);
+                const playbackSpeedValue = Math.round(60000 / bpmValue);
+                setPlaybackSpeed(playbackSpeedValue);
+              }}
+            />
+          </div>
+          <div className="grid-slider-group">
+            <input
+              id="grid-slider"
+              type="range"
+              min="0"
+              max={gridConfigurations.length - 1}
+              step="1"
+              value={gridIndex}
+              onChange={handleGridChange}
+            />
+          </div>
+        </div>
+
+        {/* Edit and Trash buttons — below sliders */}
+        <div className="eraser-container">
+          <button
+            className={`edit-button ${isEditMode ? 'active' : ''}`}
+            onClick={() => {
+              setIsEditMode(prev => {
+                const newState = !prev;
+
+                if(newState) {
+                  previousToolStateRef.current = {currentColor, isTrash, isEraser};
+                  setIsTrash(false);
+                  setIsEraser(false);
+                  setSelectedLine(null);
+                } else {
+                  setCurrentColor(previousToolStateRef.current.currentColor);
+                  setIsTrash(previousToolStateRef.current.isTrash);
+                  setIsEraser(previousToolStateRef.current.isEraser);
+
+                  exitEditMode();
+                }
+
+                return newState;
+              });
+            }}
+          >
+            <img src={EditIcon} alt="Edit" className="iconEdit" />
+          </button>
+
+          <button
+            className={`trash-button ${!isEditMode && isTrash ? 'active' : ''}`}
+            onClick={() => {
+              if(isEditMode) exitEditMode();
+              if (isTrash) {
+                setCurrentColor(previousColor);
+                setIsEraser(false);
+              } else {
+                setPreviousColor(currentColor);
+                setCurrentColor('eraser');
+                setIsEraser(false);
+              }
+              setIsTrash(!isTrash);
+            }}
+          >
+            <img src={TrashIcon} alt="Trash" className="iconTrash" />
+          </button>
+        </div>
+
+        {/* Loop & Scale Control */}
+        {/* <div className="loop-scale-group">
+          <button
+            className={`loop-button ${loop ? 'active' : 'inactive'}`}
+            onClick={() => setLoop(!loop)}
+          >
+            <img
+              src={loop ? LoopIcon : NoLoopIcon}
+              alt={loop ? "Loop" : "noLoop"}
+              className={loop ? "iconLoop" : "noLoop"}
+            />
+          </button>
+          <button
+            className="scale-button"
+            onClick={() => setIsScaleMenuOpen(true)} // Open the pop-up
+          >
+            <img
+              src={scaleIcons[currentScale]}
+              alt={`${currentScale} icon`}
+              className="scale-icon"
+            />
+          </button>
+        </div> */}
+        {/* <div className="loop-scale-group">
+          <button
+            className="scale-button"
+            onClick={() => setIsScaleMenuOpen(true)}
+          >
+            <img
+              src={scaleIcons[currentScale]}
+              alt={`${currentScale} icon`}
+              className="scale-icon"
+            />
+          </button>
+        </div> */}
+
+        {/* Grid + Scale Row */}
+        <div className="grid-scale-row">
+          <button
+            className="grid-button"
+            onClick={toggleGrid}
+          >
+            <img src={GridIcon} alt="Grid Icon" className="iconGrid" />
+          </button>
+
+          <button
+            className="scale-button"
+            onClick={() => setIsScaleMenuOpen(true)}
+          >
+            <img
+              src={scaleIcons[currentScale]}
+              alt={`${currentScale} icon`}
+              className="scale-icon"
+            />
+          </button>
+        </div>
+
+        {/* Undo and Redo Buttons */}
+        <div className="steps-group">
+          <button className="undo" onClick={handleUndo}>
+            <img src={UndoIcon} alt="Undo" className="iconDo" />
+          </button>
+          <button className="redo" onClick={handleRedo}>
+            <img src={RedoIcon} alt="Redo" className="iconDo" />
+          </button>
+        </div>
+
+        {/* Toggle Grid Visibility Button */}
+        {/* <div className="grid-group">
+          <button className="grid-button" onClick={toggleGrid}>
+            <img src={GridIcon} alt="Grid Icon" className="iconGrid" />
+          </button>
+
+          <button
+            className="clean-button"
+            onClick={() => {
+              if (isEditMode) exitEditMode();
+              handleClearScreen();
+            }}
+          >
+            <img src={CleanIcon} alt="Clean Icon" className="iconClean" />
+          </button>
+
+        </div> */}
+
+        <div className="load-save-group">
+          <button className="save-button" onClick={handleSaveDrawing}>
+            <img src={downloadIcon} alt="Download Icon" className="iconDown" />
+          </button>
+          <button className="load-button" onClick={() => loadInputRef.click()}>
+            <img src={uploadIcon} alt="Upload Icon" className="iconUp" />
+          </button>
+        </div>
+
+        {/* Pop-up for clearing the screen */}
+        {isClearScreenPopupVisible && (
+          <ClearScreenPopup onConfirm={confirmClearScreen} onCancel={cancelClearScreen} />
+        )}
+
+        {/* Hidden file input for loading */}
+        <input
+          type="file"
+          accept=".json"
+          onChange={handleLoadDrawing}
+          style={{ display: "none" }} // Hide the input, trigger with a button
+          ref={(input) => (loadInputRef = input)} // Assign the input to the ref
+        />
+
+        {/* Save Pop-up */}
+        {isSavePopupVisible && (
+          <SavePopup onSave={handleSave} onCancel={cancelSaveDrawing} />
+        )}
+
+        {/* Your other UI elements */}
+        <svg ref={svgRef} /* other attributes */>
+          {/* SVG content */}
+        </svg>
+        </div>{/* end controls-scaler */}
+      </div>
+
+      <div
+        // className="canvas-container">
+        className={`canvas-container ${isEditMode ? 'edit-mode-active' : ''}`}
+        // style={{
+        //   backgroundColor: isEditMode ? '#f0f0f0' : '#ffffff', // Change background color dynamically
+        // }}
+        >
+        {/* Grid Canvas Component */}
+        <GridCanvas
+         showGrid={showGrid}
+         scannedColumn={scannedColumn}
+         intersectedDots={intersectedDots.current}
+        //  intersectedDots={intersectedDotsState} // Use the state instead of the ref
+         gridConfig={gridConfig}
+         colorSlots={colorSlots}
+        />
+
+        {/* SVG Drawing Area */}
+        <svg
+          ref={svgRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          style={{ touchAction: 'none', width: '100%', height: '100%' }}
+        >
+
+
+          {allStrokes}
+          {currentLine.length > 0 && <path d={currentStroke} fill={colorSlots[currentColor]} />}
+          {isSweepSelecting && clickPointRef.current && boxSelectCurrent && (
+            <rect
+              x={Math.min(clickPointRef.current[0], boxSelectCurrent[0])}
+              y={Math.min(clickPointRef.current[1], boxSelectCurrent[1])}
+              width={Math.abs(boxSelectCurrent[0] - clickPointRef.current[0])}
+              height={Math.abs(boxSelectCurrent[1] - clickPointRef.current[1])}
+              fill="rgba(0, 150, 180, 0.08)"
+              stroke="rgba(0, 150, 180, 0.55)"
+              strokeWidth={1.5}
+              strokeDasharray="6 4"
+              pointerEvents="none"
+            />
+          )}
+        </svg>
+      </div>
+
+      {isSettingsMenuOpen && (
+      <div ref={settingsMenuRef} className="settings-selection-modal">
+        <button
+          onClick={handleCloseSettingsMenu} // Close the pop-up
+          className="close-modal-button top-left"
+        >
+          <img src={quitIcon} alt="Close" className="iconQuit" />
+        </button>
+        <div className="settings-options-grid">
+          <div className="settings-option">
+            {/* <button
+              className="clean-button"
+              onClick={() => {
+                if (isEditMode) exitEditMode();
+                handleClearScreen();
+              }}
+            >
+              <img src={CleanIcon} alt="Clean Icon" className="iconClean" />
+            </button> */}
+            <span className="settings-label">Clean Canvas</span>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* Scale Selection Modal */}
+      {isScaleMenuOpen && (
+        <div ref={scaleMenuRef} className="scale-selection-modal">
+          <button
+            onClick={() => setIsScaleMenuOpen(false)}
+            className="close-modal-button top-left"
+          >
+            <img src={quitIcon} alt="Close" className="iconQuit" />
+          </button>
+          <div className="scale-options-grid">
+            {Object.keys(scaleIcons).map((scale, index) => (
+              <div key={index} className="scale-option-cell">
+                <button
+                  className="scale-option-button"
+                  onClick={() => handleScaleChange(scale)}
+                >
+                  <img
+                    src={scaleIcons[scale]}
+                    alt={`${scale} icon`}
+                    className="scale-option-icon"
+                  />
+                </button>
+                <span className="scale-label">{customScaleNames[scale]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedSlot && (
+        <div
+          className="popup-overlay"
+          onClick={closeInstrumentMenu}
+        >
+          <div
+            ref={instrumentMenuRef}
+            className="combined-selection-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+          <button onClick={closeInstrumentMenu} className="close-modal-button top-left">
+            <img src={quitIcon} alt="Close" className="iconQuit" />
+          </button>
+
+          <div className="color-options">
+            {colorPaletteGrid.map((row, rowIndex) =>
+              row.map((color, colIndex) => (
+                <button
+                  key={`${rowIndex}-${colIndex}`}
+                  style={{ backgroundColor: color }}
+                  // style={{ borderColor: color }}
+                  // className="color-option"
+                  className={`color-option ${ // changed - Renee
+                    colorSlots[selectedSlot] === color ? 'active' : ''
+                  }`}
+                  onClick={() => {
+                    updateColorForSlot(selectedSlot, color); 
+                  }}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="instrument-options">
+            {instrumentOptions.map((instrument, index) => (
+              <div key={index} className="instrument-option-cell">
+                <button
+                  onClick={() => updateInstrumentForColor(instrument)}
+                  className={`instrument-option-button ${ // changed - Renee
+                    colorInstrumentMap[selectedSlot] === instrument ? 'active' : ''
+                  }`}
+                >
+                  <img
+                    src={instrumentIcons[instrument]}
+                    alt={instrument}
+                    className="instrument-icon"
+                  />
+                </button>
+                <span className="instrument-label">
+                  {customInstrumentNames[instrument]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        </div>
+      )}
+
+      {selectedLine && (
+        <div
+          className="popup-overlay"
+          onClick={() => setSelectedLine(null)}
+        >
+          <div
+            ref={instrumentMenuRef}
+            className="combined-selection-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+          <button onClick={() => setSelectedLine(null)} className="close-modal-button top-left">
+            <img src={quitIcon} alt="Close" className="iconQuit" />
+          </button>
+          {/* Color Grid on the Left */}
+          <div className="color-options">
+            {colorPaletteGrid.map((row, rowIndex) =>
+              row.map((color, colIndex) => (
+                <button
+                  key={`${rowIndex}-${colIndex}`}
+                  style={{ backgroundColor: color }}
+                  // style={{ borderColor: color }}
+                  // className="color-option"
+                  className={`color-option ${
+                    selectedLine.color === color ? 'active' : ''
+                  }`}
+                  onClick={() => {
+                    updateLineColor(selectedLine, color); // Update the line's color
+                  }}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Instrument Grid on the Right */}
+          <div className="instrument-options">
+            {instrumentOptions.map((instrument, index) => (
+              <div key={index} className="instrument-option-cell">
+                <button
+                  onClick={() => updateLineInstrument(selectedLine, instrument)} // Update the line's instrument
+                  className="instrument-option-button"
+                >
+                  <img
+                    src={instrumentIcons[instrument]}
+                    alt={instrument}
+                    className="instrument-icon"
+                  />
+                </button>
+                <span className="instrument-label">
+                  {customInstrumentNames[instrument]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        </div>
+      )}
+
+
+
+      {isLoading && (
+        <div className="loading-popup">
+          <div className="loading-content">
+            <h1>SoundInk</h1>
+            <p>Please wait while the sounds are being loaded.</p>
+            <div className="loading-spinner"></div>
+          </div>
+        </div>
+      )}
+
+      {isDownloading && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <p>Downloading...</p>
+            <div className="loading-spinner"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Screen Pop-up */}
+      {isClearScreenPopupVisible && (
+        <ClearScreenPopup onConfirm={confirmClearScreen} onCancel={cancelClearScreen} />
+      )}
+
+      {/* Save Pop-up */}
+      {isSavePopupVisible && (
+        <SavePopup onSave={handleSave} onCancel={cancelSaveDrawing} />
+      )}
+
+      {/* Phone UI: hidden on desktop/tablet via CSS media query */}
+
+      {/* Slide-up drawer */}
+      {isPhoneMenuOpen && (
+        <div className="phone-drawer-overlay" onClick={() => setIsPhoneMenuOpen(false)}>
+          <div className="phone-drawer" onClick={e => e.stopPropagation()}>
+            <div className="phone-drawer-header">
+              <button className="phone-drawer-close" onClick={() => setIsPhoneMenuOpen(false)}>×</button>
+            </div>
+
+            <div className="phone-drawer-sliders">
+              <div className="brush-size-group">
+                <input type="range" min="1" max="50" step="1" value={currentSize}
+                  onChange={e => setCurrentSize(Number(e.target.value))} />
+              </div>
+              <div className="volume-slider-group">
+                <input type="range" min="0" max="1" step="0.01" value={volume}
+                  onChange={e => { const v = parseFloat(e.target.value); setVolume(v); setMasterVolume(v); }} />
+              </div>
+              <div className="slider-group">
+                <input type="range" min="60" max="400" step="5" value={bpm}
+                  onChange={e => { const b = Number(e.target.value); setBpm(b); setPlaybackSpeed(Math.round(60000 / b)); }} />
+              </div>
+              <div className="grid-slider-group">
+                <input type="range" min="0" max={gridConfigurations.length - 1} step="1"
+                  value={gridIndex} onChange={handleGridChange} />
+              </div>
+            </div>
+
+            <div className="phone-drawer-buttons">
+              <button
+                className={`edit-button ${isEditMode ? 'active' : ''}`}
+                onClick={() => {
+                  setIsEditMode(prev => {
+                    const next = !prev;
+                    if (next) {
+                      previousToolStateRef.current = { currentColor, isTrash, isEraser };
+                      setIsTrash(false); setIsEraser(false); setSelectedLine(null);
+                    } else {
+                      setCurrentColor(previousToolStateRef.current.currentColor);
+                      setIsTrash(previousToolStateRef.current.isTrash);
+                      setIsEraser(previousToolStateRef.current.isEraser);
+                      exitEditMode();
+                    }
+                    return next;
+                  });
+                  setIsPhoneMenuOpen(false);
+                }}
+              >
+                <img src={EditIcon} alt="Edit" className="iconEdit" />
+              </button>
+
+              <button
+                className={`trash-button ${!isEditMode && isTrash ? 'active' : ''}`}
+                onClick={() => {
+                  if (isEditMode) exitEditMode();
+                  if (isTrash) { setCurrentColor(previousColor); setIsEraser(false); }
+                  else { setPreviousColor(currentColor); setCurrentColor('eraser'); setIsEraser(false); }
+                  setIsTrash(!isTrash);
+                  setIsPhoneMenuOpen(false);
+                }}
+              >
+                <img src={TrashIcon} alt="Trash" className="iconTrash" />
+              </button>
+
+              <button className="grid-button" onClick={() => { toggleGrid(); setIsPhoneMenuOpen(false); }}>
+                <img src={GridIcon} alt="Grid" className="iconGrid" />
+              </button>
+
+              <button className="scale-button" onClick={() => { setIsScaleMenuOpen(true); setIsPhoneMenuOpen(false); }}>
+                <img src={scaleIcons[currentScale]} alt={currentScale} className="scale-icon" />
+              </button>
+
+              <button className="save-button" onClick={() => { handleSaveDrawing(); setIsPhoneMenuOpen(false); }}>
+                <img src={downloadIcon} alt="Save" className="iconDown" />
+              </button>
+
+              <button className="load-button" onClick={() => { loadInputRef.click(); setIsPhoneMenuOpen(false); }}>
+                <img src={uploadIcon} alt="Load" className="iconUp" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom bar */}
+      <div className="phone-bottom-bar">
+        <div className="phone-color-strip">
+          {Object.keys(colorInstrumentMap).map((slot, index) => (
+            <button
+              key={index}
+              className={`phone-color-dot ${!isEditMode && currentColor === slot ? 'active' : ''}`}
+              style={{ border: `7px solid ${colorSlots[slot]}` }}
+              onMouseDown={() => handleMouseDown(slot)}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onClick={() => { exitEditMode(); setCurrentColor(slot); setIsEraser(false); setIsTrash(false); }}
+            >
+              <img src={instrumentIcons[colorInstrumentMap[slot]]} alt={colorInstrumentMap[slot]} className="phone-color-icon" />
+            </button>
+          ))}
+          <button
+            className="phone-gear-btn"
+            onClick={() => openInstrumentMenu(currentColor)}
+          >
+            <img src={GearIcon} alt="Edit" className="iconGear" />
+          </button>
+        </div>
+
+        <button
+          className={`phone-play-btn ${isPlaying ? 'stop-mode' : 'play-mode'}`}
+          onClick={() => { if (isPlaying) { playbackStopped.current = true; } else { handlePlay(); } }}
+        >
+          <img src={isPlaying ? StopIcon : PlayIcon} alt={isPlaying ? 'Stop' : 'Play'} className={isPlaying ? 'iconStop' : 'iconPlay'} />
+        </button>
+
+        <button className="undo phone-action-btn" onClick={handleUndo}>
+          <img src={UndoIcon} alt="Undo" className="iconDo" />
+        </button>
+        <button className="redo phone-action-btn" onClick={handleRedo}>
+          <img src={RedoIcon} alt="Redo" className="iconDo" />
+        </button>
+
+        <button className="phone-menu-btn" onClick={() => setIsPhoneMenuOpen(o => !o)}>
+          <span className="phone-menu-icon">☰</span>
+        </button>
+      </div>
+
+    </div>
+  );
+}
+
+export default CanvasComponent;
